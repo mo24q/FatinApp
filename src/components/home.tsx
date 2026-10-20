@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpLeft, Check, Clock3, Gamepad2, LockKeyhole, Plus, Sparkles, Users, X, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowUpLeft, Check, Clock3, Fingerprint, Gamepad2, LockKeyhole, Plus, Sparkles, Users, X, Zap } from 'lucide-react';
 import { Brand, Footer } from './brand';
 import { Captcha } from './captcha';
 import { games } from '@/lib/games';
@@ -35,8 +35,9 @@ export function Home() {
     try {
       await ensureGuest(captchaToken);
       const room = await action<Room>(modal === 'create' ? 'create' : 'join', code, { p_name: name.trim(), p_seconds: seconds });
-      localStorage.setItem('lamma-name', name.trim()); localStorage.setItem('lamma-room', room.code);
-      router.push(`/room/${room.code}`);
+      localStorage.setItem('lamma-name', name.trim());
+      if(!('game' in room && room.game==='crime'))localStorage.setItem('lamma-room', room.code);
+      router.push('game' in room && room.game==='crime' ? `/crime/room/${room.code}` : `/room/${room.code}`);
     } catch (e) { setError(friendlyError(e)); setBusy(false); }
   }
   return <div className="site-shell">
@@ -46,7 +47,7 @@ export function Home() {
         <div className="hero-copy"><div className="eyebrow"><span className="green-dot"/> وجيه نحبها. وقت يجمعنا.</div>
           <h1>جمعتكم<br/>ناقصها <span className="headline-word">لعبة<svg viewBox="0 0 240 22" aria-hidden="true"><path d="M5 16 Q110 -2 235 12"/></svg></span><span className="orange">.</span></h1>
           <p className="hero-description">مع فطين، كل جمعة لها سالفة.<br/>كل واحد بجواله، أو جوال واحد يمرّ بينكم. اختاروا طريقتكم.</p>
-          <div className="hero-buttons"><button className="button primary" onClick={() => setModal('mode')}>نلعب مع فطين <ArrowLeft size={20}/></button><button className="button white" onClick={() => setModal('join')}>معك رمز غرفة؟</button></div>
+          <div className="hero-buttons"><a className="button primary" href="#games">نلعب مع فطين <ArrowLeft size={20}/></a><button className="button white" onClick={() => setModal('join')}>معك رمز غرفة؟</button></div>
           <div className="hero-perks"><span><Check size={15}/> بدون حسابات</span><span><Check size={15}/> جوال واحد أو أكثر</span><span><Check size={15}/> حضوري أو عن بُعد</span></div>
           {lastRoom && <button className="resume-link" onClick={() => router.push(`/room/${lastRoom}`)}>العودة لغرفتك <b dir="ltr">{lastRoom}</b> <ArrowLeft size={15}/></button>}
         </div>
@@ -60,11 +61,11 @@ export function Home() {
         </div>
       </section>
       <section className="gather-strip"><span className="strip-icon"><Gamepad2 size={23}/></span><p><strong>فطين يجمعكم. حتى بجوال واحد.</strong><span>لا أوراق، لا تجهيز طويل. بس أنتم واللعبة.</span></p><span className="strip-sparkle">✧</span></section>
-      <section id="games" className="games-section"><div className="section-heading"><div><span className="section-kicker">وش جوّكم اليوم؟</span><h2>اختاروا لعبتكم في فطين.</h2></div><span className="soft-badge">البداية بلعبة… والباقي جاي</span></div>
+      <section id="games" className="games-section"><div className="section-heading"><div><span className="section-kicker">وش جوّكم اليوم؟</span><h2>اختاروا لعبتكم في فطين.</h2></div><span className="soft-badge">ألعاب فطين، بطريقتكم</span></div>
         <div className="games-grid">{games.map((game, i) => <article key={game.id} className={`game-card ${game.available ? 'available' : 'coming'}`}>
-          <div className={`game-visual visual-${i}`}><span className="game-tag">{game.available ? 'جاهزة للّعب' : 'قريبًا'}</span>{i === 0 ? <><div className="question-mark">؟</div><Character small/><div className="small-chat">أنا؟ مستحيل!</div></> : i === 1 ? <><Zap className="big-game-icon" strokeWidth={1.5}/><span className="decorative-letters">أ ب ج</span></> : <><div className="wave-circle circle-one"/><div className="wave-circle circle-two"/><Sparkles className="wave-star" size={30}/></>}</div>
+          <div className={`game-visual visual-${i} ${game.id==='crime'?'visual-crime':''}`}><span className="game-tag">{game.available ? 'جاهزة للّعب' : 'قريبًا'}</span>{game.id==='crime'?<><Fingerprint className="crime-game-icon" size={87} strokeWidth={1.2}/><span className="crime-game-label">ملف القضية · ٠٠٢</span></>:game.id==='outsider' ? <><div className="question-mark">؟</div><Character small/><div className="small-chat">أنا؟ مستحيل!</div></> : game.id==='quick-answer' ? <><Zap className="big-game-icon" strokeWidth={1.5}/><span className="decorative-letters">أ ب ج</span></> : <><div className="wave-circle circle-one"/><div className="wave-circle circle-two"/><Sparkles className="wave-star" size={30}/></>}</div>
           <div className="game-content"><span className="game-category">{game.tag}</span><h3>{game.name}</h3><p>{game.description}</p><div className="game-meta"><span><Users size={16}/>{game.players}</span>{game.time && <span><Clock3 size={16}/>{game.time}</span>}</div>
-            <button disabled={!game.available} className={`button full ${game.available ? 'light-purple' : 'coming-button'}`} onClick={() => setModal('mode')}>{game.available ? 'نلعب برا السالفة' : 'قريبًا في فطين'}{game.available && <ArrowLeft size={18}/>}</button>
+            <button disabled={!game.available} className={`button full ${game.available ? 'light-purple' : 'coming-button'}`} onClick={() => game.id==='crime'?router.push('/crime'):setModal('mode')}>{game.available ? `نلعب ${game.name}` : 'قريبًا في فطين'}{game.available && <ArrowLeft size={18}/>}</button>
           </div></article>)}</div>
       </section>
       <section id="how" className="how-section"><div className="section-heading"><div><span className="section-kicker">أسهل من ترتيب الطلعة</span><h2>ثلاث خطوات، وتبدأ السوالف.</h2></div></div><div className="steps-grid">
