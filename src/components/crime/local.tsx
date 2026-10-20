@@ -42,7 +42,7 @@ export function LocalCrimeGame() {
           <button className="button white full" type="button" disabled={names.length>=12} onClick={()=>setNames([...names,''])}><Plus size={17}/>إضافة لاعب · {names.length}/12</button>
           <label className="crime-narrator-select">مَن الراوي؟<select value={narrator} onChange={e=>setNarrator(Number(e.target.value))}>{names.map((name,i)=><option key={i} value={i}>{name||`اللاعب ${i+1}`}</option>)}</select></label>
           <p className="field-note">الراوي يعرف الحل ويدير القضية. ملفه يأتي أخيرًا بعد اختيار المجرم.</p><button className="button primary full">وزّع ملفات القضية</button>
-        </form><p className="local-privacy">الأدوار محفوظة على هذا الجهاز. تمرير الجوال يعتمد على الأمانة؛ روابط مشاركة البطاقات لا تحتوي على الأدوار أو الحل.</p>
+        </form><p className="local-privacy">الأدوار محفوظة على هذا الجهاز. تمرير الجوال يعتمد على الأمانة؛ صور مشاركة البطاقات لا تحتوي على الأدوار أو الحل.</p>
       </section>:view&&<>
         <div className="crime-round-bar"><span>القضية {game.round.toLocaleString('ar-SA')}</span><span>{game.phase==='reveal'?`توزيع الملفات ${game.cursor+1}/${game.order.length}`:game.phase==='investigate'?'التحقيق مفتوح':'أُغلق الملف'}</span></div>
         {game.phase==='reveal'?<PrivateFile key={`${game.round}-${actor}`} view={view} actor={actor} secret={secret} shown={shown} busy={false} seen={seen} onShow={()=>{setShown(true);setSeen(true);}} onHide={()=>setShown(false)} onChoose={(w,e)=>run(()=>chooseCrime(game,actor,w,e),false)} onReady={()=>run(()=>advanceCrimeRole(game))}/>:<>

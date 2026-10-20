@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Axe, Bell, BookOpen, Camera, Check, Circle, CircleHelp, Coins, Disc3, Dumbbell, Feather, Flag, Flashlight, Flower2, Gem, Glasses, Hammer, Headphones, KeyRound, Leaf, Link2, LockKeyhole, Mail, Map, Paintbrush, Paperclip, Puzzle, ReceiptText, Scissors, Share2, Shirt, ShoppingBag, Smartphone, Ticket, Trophy, Umbrella, Usb, Wallet, Watch, Wrench } from 'lucide-react';
 import { crimeCardById, type CrimeCard } from '@/lib/crime-content';
-import { shareCrimeHand, type CrimeHand, type CrimeSolution } from '@/lib/crime-game';
+import type { CrimeHand, CrimeSolution } from '@/lib/crime-game';
+import { createCrimeImage } from '@/lib/crime-image';
 
 const artIcons = {hammer:Hammer,axe:Axe,wrench:Wrench,tool:Wrench,scissors:Scissors,rope:Link2,chain:Link2,cable:Usb,weight:Dumbbell,umbrella:Umbrella,flashlight:Flashlight,trophy:Trophy,bell:Bell,lock:LockKeyhole,key:KeyRound,watch:Watch,ring:Circle,glasses:Glasses,phone:Smartphone,wallet:Wallet,ticket:Ticket,receipt:ReceiptText,photo:Camera,button:Circle,glove:Shirt,cloth:Shirt,feather:Feather,leaf:Leaf,flower:Flower2,mail:Mail,map:Map,pen:Paintbrush,book:BookOpen,coin:Coins,card:Ticket,headphones:Headphones,hat:Shirt,tie:Shirt,clip:Paperclip,necklace:Gem,badge:Flag,paper:ReceiptText,bag:ShoppingBag,brush:Paintbrush,mirror:Circle,usb:Usb,camera:Camera,disc:Disc3,ball:Circle,shell:Gem,puzzle:Puzzle} as const;
 function ObjectShape({art}:{art:string}) {
@@ -70,15 +71,59 @@ export function HandGrid({hand,selection,onSelect,disabled,solution}:{hand:Crime
   </div>;
 }
 export function ShareHand({hand,name}:{hand:CrimeHand;name:string}) {
-  const [fallback,setFallback]=useState('');
-  const [copied,setCopied]=useState(false);
-  async function share() {
-    const url=`${location.origin}/crime/cards#${shareCrimeHand(name,hand)}`;
-    if(navigator.share) {
-      try {await navigator.share({title:`بطاقات ${name} — فطين`,text:'بطاقات ظاهرة للجميع، بدون دور أو حل الجريمة.',url});return;}
-      catch(e) {if(e instanceof Error&&e.name==='AbortError')return;}
+  const artwork=useRef<HTMLDivElement>(null);
+  const key=JSON.stringify([name,hand.weapons,hand.evidence]);
+  const [prepared,setPrepared]=useState<{key:string;file:File;url:string}|null>(null);
+  const [error,setError]=useState('');
+  const [message,setMessage]=useState('');
+  const [sharing,setSharing]=useState(false);
+  const [retry,setRetry]=useState(0);
+  const [preview,setPreview]=useState(false);
+  const current=prepared?.key===key?prepared:null;
+  useEffect(()=>{
+    let cancelled=false;
+    let objectUrl='';
+    setError('');setMessage('');setPreview(false);
+    if(artwork.current){
+      const [player,weapons,evidence]=JSON.parse(key) as [string,string[],string[]];
+      void createCrimeImage(artwork.current,{player_id:'',weapons,evidence},player).then(file=>{
+        if(cancelled)return;
+        objectUrl=URL.createObjectURL(file);
+        setPrepared({key,file,url:objectUrl});
+      }).catch(()=>{if(!cancelled)setError('تعذّر تجهيز الصورة. حاول مرة ثانية.');});
     }
-    try {await navigator.clipboard.writeText(url);setCopied(true);} catch{setFallback(url);}
+    return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
+  },[key,retry]);
+  function download() {
+    if(!current)return;
+    const link=document.createElement('a');
+    link.href=current.url;link.download=current.file.name;
+    document.body.appendChild(link);link.click();link.remove();
+    setPreview(true);
+    setMessage('إذا ما بدأ التنزيل، اضغط مطوّلًا على الصورة واحفظها.');
   }
-  return <div className="crime-share"><button className="text-button" onClick={()=>void share()}><Share2 size={15}/>{copied?'تم نسخ رابط البطاقات':'مشاركة هذه البطاقات'}</button>{fallback&&<label>انسخ الرابط<input readOnly value={fallback} dir="ltr" onFocus={e=>e.target.select()}/></label>}<small>رابط ثابت للبطاقات فقط؛ لا يتضمن الدور أو الحل.</small></div>;
+  async function share() {
+    if(!current||sharing)return;
+    setSharing(true);setMessage('');
+    try {
+      // The PNG is prepared before the tap, preserving mobile share activation.
+      if(navigator.canShare?.({files:[current.file]})&&navigator.share){
+        await navigator.share({files:[current.file]});
+        setMessage('تمت مشاركة الصورة.');
+      }else download();
+    }catch(e){
+      if(!(e instanceof Error&&e.name==='AbortError'))download();
+    }finally{
+      setSharing(false);
+    }
+  }
+  return <div className="crime-share">
+    <div ref={artwork} hidden aria-hidden="true">{[...hand.weapons,...hand.evidence].map(id=><span key={id} data-card-art={id}><CrimeArtwork card={crimeCardById[id]}/></span>)}</div>
+    <button type="button" className="text-button" disabled={!current||sharing} onClick={()=>void share()}><Share2 size={15}/>{sharing?'جارٍ المشاركة…':current?'مشاركة البطاقات كصورة':error?'الصورة غير جاهزة':'نجهّز صورة البطاقات…'}</button>
+    {current&&<button type="button" className="text-button" onClick={download}>تنزيل الصورة</button>}
+    {error&&<div role="alert"><p>{error}</p><button type="button" className="text-button" onClick={()=>setRetry(value=>value+1)}>إعادة المحاولة</button></div>}
+    {message&&<p role="status">{message}</p>}
+    {preview&&current&&<img src={current.url} alt={`بطاقات ${name}: أربعة أسلحة وأربعة أدلة`} style={{width:'100%',height:'auto',borderRadius:16,marginTop:12}}/>}
+    <small>صورة البطاقات فقط، بدون رابط أو دور أو حل القضية.</small>
+  </div>;
 }
