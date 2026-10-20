@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, Fingerprint, Search, ShieldCheck, Trophy } from 'lucide-react';
-import { clueBoards, crimeCardById } from '@/lib/crime-content';
+import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, Fingerprint, ShieldCheck, Trophy } from 'lucide-react';
+import { crimeCardById } from '@/lib/crime-content';
 import type { CrimeSecret, CrimeView } from '@/lib/crime-game';
 import type { TimerCommand } from '@/lib/local-game';
 import { TimerPanel } from '../timer-panel';
@@ -11,7 +11,6 @@ export function CrimeRules() {
   return <details className="crime-rules"><summary>كيف نلعب الجريمة المغلقة؟</summary><ol>
     <li>اختاروا راويًا؛ البقية يستلمون ٤ أسلحة و٤ أدلة لكل شخص، وبينهم مجرم واحد.</li>
     <li>المجرم يختار سرًا سلاحًا ودليلًا من بطاقاته. الحل يظهر للراوي فقط.</li>
-    <li>الراوي يرشدكم باختيارات لوحات التلميح، دون ذكر اسم لاعب أو بطاقة. يمكنه تعديلها مع النقاش.</li>
     <li>لكل لاعب غير الراوي اتهام واحد: شخص + سلاح + دليل. الثلاثة لازم تكون صحيحة معًا.</li>
     <li>إذا صح اتهام فاز المحققون. إذا استُخدمت كل المحاولات أو أغلق الراوي القضية، فاز المجرم. المجرم يشارك باتهام تمويهي.</li>
   </ol><p>الوقت اختياري؛ انتهاؤه تنبيه فقط. الراوي يقرر متى يغلق القضية بعد إعطاء الجميع فرصة.</p></details>;
@@ -29,7 +28,7 @@ export function PrivateFile({view,actor,secret,shown,busy,onShow,onHide,onChoose
     <span className="section-kicker">ملف خاص · أبعدوا النظر</span>
     <h2>الجوال مع {player?.name}؟</h2>
     {!shown||!secret?<><p>افتح ملفك وحدك، وأخفِه قبل تمرير الجوال.</p><button className="button primary" disabled={busy} onClick={onShow}><Eye size={18}/>أنا {player?.name}، افتح ملفي</button></>:<>
-      <div className={`crime-role ${role}`}><span>{role==='narrator'?'أنت الراوي':role==='killer'?'أنت المجرم':'أنت محقق'}</span><p>{role==='narrator'?'تعرف الحل. ساعد المحققين من لوحات التلميح دون كشف أسماء البطاقات.':role==='killer'?'خلك طبيعي. اختر سلاحًا ودليلًا من بطاقاتك قبل تسليم الجوال.':'راقب تلميحات الراوي وبطاقات الجميع. عندك اتهام واحد، فاختَر بعناية.'}</p></div>
+      <div className={`crime-role ${role}`}><span>{role==='narrator'?'أنت الراوي':role==='killer'?'أنت المجرم':'أنت محقق'}</span><p>{role==='narrator'?'تعرف الحل وتدير مجريات القضية. أبقِ ملفك سريًا حتى نهاية الجولة.':role==='killer'?'خلك طبيعي. اختر سلاحًا ودليلًا من بطاقاتك قبل تسليم الجوال.':'تصفّح بطاقات الجميع وناقش احتمالاتك. عندك اتهام واحد، فاختَر بعناية.'}</p></div>
       {role==='narrator'&&<>{secret.solution?<div className="crime-solution"><p>المجرم: <strong>{view.players.find(p=>p.id===secret.solution?.killer_id)?.name}</strong></p><div className="crime-solution-pair"><CrimeCardTile id={secret.solution.weapon}/><CrimeCardTile id={secret.solution.evidence}/></div></div>:<p className="notice">المجرم يختار الآن. أخفِ الملف وافتحه مجددًا بعد تثبيت الاختيار.</p>}</>}
       {hand&&<HandGrid hand={hand} selection={role==='killer'?secret.solution??selected:undefined} onSelect={role==='killer'&&!view.solution_ready?(kind,id)=>setSelected(s=>({...s,[kind]:id})):undefined} disabled={busy}/>}
       {role==='killer'&&(view.solution_ready?<p className="crime-confirmed"><Check size={16}/>تم تثبيت الاختيار. لا يظهر إلا لك وللراوي.</p>:<button className="button primary full" disabled={busy||!selected.weapon||!selected.evidence} onClick={()=>onChoose(selected.weapon,selected.evidence)}>ثبّت السلاح والدليل سرًا</button>)}
@@ -39,10 +38,10 @@ export function PrivateFile({view,actor,secret,shown,busy,onShow,onHide,onChoose
     {onReady&&seen&&<button className="button light-purple full" disabled={busy||(role==='killer'&&!view.solution_ready)} onClick={onReady}><Check size={17}/>{player?.ready?'تم تأكيد جاهزيتك':'جاهز، أخفِ الملف وكمل'}</button>}
   </section>;
 }
-export function CaseTable({view,busy,local=false,onAccuse,onClue,onClose,onTimer,secret,onSecret,onHide}:{
+export function CaseTable({view,busy,local=false,onAccuse,onClose,onTimer,secret,onSecret,onHide}:{
   view:CrimeView;busy:boolean;local?:boolean;
   onAccuse:(actor:string,target:string,weapon:string,evidence:string)=>void;
-  onClue:(board:string,choice:string)=>void;onClose:()=>void;
+  onClose:()=>void;
   onTimer:(command:TimerCommand,seconds?:number)=>void;
   secret:CrimeSecret|null;onSecret:()=>void;onHide:()=>void;
 }) {
@@ -68,15 +67,10 @@ export function CaseTable({view,busy,local=false,onAccuse,onClue,onClose,onTimer
   return <div className="crime-table">
     {view.phase==='result'&&view.result&&<section className="panel crime-outcome"><Trophy size={35}/><span className="section-kicker">انتهت القضية</span><h2>{view.result.caught?'انكشفت الجريمة!':'أفلت المجرم!'}</h2><p><strong>{view.players.find(p=>p.id===view.result?.killer_id)?.name??'المجرم'}</strong> كان المجرم. {view.result.caught?'فاز المحققون.':'فاز المجرم.'}</p><div className="crime-solution-pair"><CrimeCardTile id={view.result.weapon} solved/><CrimeCardTile id={view.result.evidence} solved/></div></section>}
     {view.phase==='investigate'&&<>
-      <section className="panel crime-clues"><div className="crime-section-title"><div><span className="section-kicker">من الراوي إلى المحققين</span><h2>خيوط القضية</h2></div><Search size={25}/></div>
-        <div className="crime-clue-grid">{clueBoards.map(board=><div className="crime-clue-tile" key={board.id}><small>{board.name}</small><strong>{view.clues[board.id]||'بانتظار الراوي'}</strong></div>)}</div>
-        <p className="field-note">التلميحات ارتباطات يختارها الراوي. ناقشوا أكثر من احتمال.</p>
-      </section>
       {viewerNarrator&&<section className="panel crime-narrator">
         <div className="crime-section-title"><h2>مساحة الراوي</h2><ShieldCheck size={22}/></div>
         {!secret||secret.role!=='narrator'?<><p>الملف التالي يكشف الحل. افتحه فقط عندما يكون الجوال مع الراوي.</p><button className="button white full" onClick={onSecret} disabled={busy}>أنا الراوي، افتح ملف القضية</button></>:<>
           {secret.solution&&<div className="crime-secret-summary"><strong>المجرم: {view.players.find(p=>p.id===secret.solution?.killer_id)?.name}</strong><p>{crimeCardById[secret.solution.weapon]?.name} + {crimeCardById[secret.solution.evidence]?.name}</p></div>}
-          <div className="crime-clue-editor">{clueBoards.map(board=><label key={board.id}>{board.name}<select aria-label={`تلميح ${board.name}`} value={view.clues[board.id]||''} disabled={busy} onChange={e=>onClue(board.id,e.target.value)}><option value="" disabled>اختر تلميحًا</option>{board.options.map(option=><option key={option}>{option}</option>)}</select></label>)}</div>
           <button className="button white full" onClick={()=>{onHide();setConfirmClose(false);}}><EyeOff size={16}/>أخفِ حل القضية</button>
           {!confirmClose?<button className="text-button danger" onClick={()=>setConfirmClose(true)}>إغلاق القضية وإعلان فوز المجرم</button>:<div className="crime-confirm-box"><p>متأكد أن الجميع أخذ فرصته؟ إغلاق القضية يكشف الحل وينهي الجولة.</p><button className="button primary" onClick={()=>{onClose();setConfirmClose(false);}} disabled={busy}>نعم، أغلق القضية</button><button className="text-button" onClick={()=>setConfirmClose(false)}>نكمّل التحقيق</button></div>}
         </>}

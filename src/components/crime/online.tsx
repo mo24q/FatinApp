@@ -121,7 +121,7 @@ export function CrimeOnline({code}:{code:string}) {
         </>}
         {(room.phase==='investigate'||room.phase==='result')&&<CaseTable key={`${room.round}-${room.phase}`} view={room} busy={disabled} secret={secret} onSecret={()=>void showSecret()} onHide={hide}
           onAccuse={(_actor,target,weapon,evidence)=>void act('accuse',{target,weapon,evidence})}
-          onClue={(board,choice)=>void act('clue',{board,choice})} onClose={()=>void act('close')}
+          onClose={()=>void act('close')}
           onTimer={(command,seconds)=>void act(command,{seconds,phase:room.phase})}/>}
         {room.phase==='investigate'&&room.me!==room.narrator_id&&<div className="crime-own-role">{secret?<><span>{secret.role==='killer'?'أنت المجرم':'أنت محقق'}</span><button className="text-button" onClick={hide}>إخفاء دوري</button></>:<button className="text-button" disabled={disabled} onClick={()=>void showSecret()}>تذكّر دوري سرًا</button>}</div>}
         <div className="room-actions"><Link className="text-button" href="/crime">ألعاب فطين</Link>{room.is_host&&!canManage?<button className="text-button danger" disabled={disabled} onClick={()=>{hide();setConfirm('cancel');}}>إلغاء القضية</button>:canManage?<button className="text-button danger" disabled={disabled} onClick={()=>setConfirm('leave')}>مغادرة الغرفة</button>:null}</div>

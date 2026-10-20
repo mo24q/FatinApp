@@ -68,14 +68,14 @@ button.crime-card.selected,.crime-card.solved{border:2px solid var(--purple);pad
 .crime-share .text-button{display:flex;align-items:center;gap:7px;font-size:12px}
 .crime-share>small{display:block;font-size:10px;color:var(--muted);margin-top:5px}
 .crime-share input{font:11px monospace}
-.crime-clue-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.crime-clue-tile{border:1px solid #e6dfec;background:#faf8fd;border-radius:12px;padding:12px}
-.crime-clue-tile>small{display:block;color:#a092af;font-size:10px;margin-bottom:7px}
-.crime-clue-tile>strong{font-size:13px;font-weight:700}
+
+
+
+
 .crime-narrator{border-color:#cfe1d5!important;background:#fafffc!important}
 .crime-narrator>p{margin-bottom:15px}
-.crime-clue-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:18px}
-.crime-clue-editor select{font-size:12px}
+
+
 .crime-secret-summary{background:#e9f2ed;border:1px dashed #abc7b5;border-radius:12px;padding:14px;margin-bottom:18px;font-size:13px}
 .crime-narrator>.danger{display:block;margin:16px auto 0;font-size:11px;color:#a16e76}
 .crime-accuse>p{margin:8px 0 18px}
@@ -110,4 +110,4 @@ button.crime-card.selected,.crime-card.solved{border:2px solid var(--purple);pad
 .crime-own-role{display:flex;gap:12px;justify-content:center;padding:18px;font-size:12px}
 .crime-shell .room-actions{max-width:620px;margin:20px auto}
 @media(min-width:700px){.crime-card{grid-template-columns:74px minmax(0,1fr);min-height:112px}.crime-art{width:74px;height:78px}.crime-card-name{font-size:14px}}
-@media(max-width:420px){.crime-shell .panel{padding:17px}.crime-hand{gap:9px}.crime-card{grid-template-columns:1fr;min-height:109px;text-align:center;padding:8px 5px;gap:0}.crime-art{width:58px;height:59px;margin:auto}.crime-card-name{font-size:11px;line-height:1.7}.crime-card-stack{gap:8px}.crime-hand-column>h3{font-size:10px;gap:4px}.crime-hand-column>h3>small{display:none}button.crime-card.selected,.crime-card.solved{padding:7px 4px}.crime-intro-cards{gap:5px}.crime-intro-cards>.crime-card{min-height:135px;width:100px}.crime-intro-cards .crime-art{height:75px;width:75px}.crime-facts{gap:5px}.crime-facts>span{font-size:9px}.crime-rules{padding:14px}.crime-clue-editor{gap:10px}.crime-clue-editor select{font-size:11px;padding:9px}.crime-room-code{gap:9px}.crime-heading h1{font-size:27px}}
+@media(max-width:420px){.crime-shell .panel{padding:17px}.crime-hand{gap:9px}.crime-card{grid-template-columns:1fr;min-height:109px;text-align:center;padding:8px 5px;gap:0}.crime-art{width:58px;height:59px;margin:auto}.crime-card-name{font-size:11px;line-height:1.7}.crime-card-stack{gap:8px}.crime-hand-column>h3{font-size:10px;gap:4px}.crime-hand-column>h3>small{display:none}button.crime-card.selected,.crime-card.solved{padding:7px 4px}.crime-intro-cards{gap:5px}.crime-intro-cards>.crime-card{min-height:135px;width:100px}.crime-intro-cards .crime-art{height:75px;width:75px}.crime-facts{gap:5px}.crime-facts>span{font-size:9px}.crime-rules{padding:14px}.crime-room-code{gap:9px}.crime-heading h1{font-size:27px}}

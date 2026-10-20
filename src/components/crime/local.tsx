@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Fingerprint, Plus, RefreshCw, Smartphone, X } from 'lucide-react';
 import { Brand, Footer } from '../brand';
 import { CaseTable, CrimeRules, PrivateFile } from './table';
-import { accuseCrime,advanceCrimeRole,chooseCrime,closeCrime,crimeSecret,crimeTimer,newCrime,publicCrime,restoreCrime,setCrimeClue,type LocalCrime } from '@/lib/crime-game';
+import { accuseCrime,advanceCrimeRole,chooseCrime,closeCrime,crimeSecret,crimeTimer,newCrime,publicCrime,restoreCrime,type LocalCrime } from '@/lib/crime-game';
 import { crimeError } from '@/lib/crime-client';
 
 const storageKey='fatin-crime-local-v1';
@@ -41,14 +41,13 @@ export function LocalCrimeGame() {
           <div className="local-names">{names.map((name,i)=><div className="local-name-row" key={i}><span className={`avatar avatar-${i%4}`}>{i+1}</span><label><span>اسم اللاعب {i+1}</span><input aria-label={`اسم اللاعب ${i+1}`} value={name} onChange={e=>setNames(names.map((n,j)=>j===i?e.target.value:n))} minLength={2} maxLength={20} required placeholder={`اللاعب ${i+1}`} autoComplete="off"/></label><button type="button" className="icon-button" aria-label={`حذف اللاعب ${i+1}`} disabled={names.length<=4} onClick={()=>{setNames(names.filter((_,j)=>j!==i));setNarrator(narrator===i?0:narrator>i?narrator-1:narrator);}}><X size={16}/></button></div>)}</div>
           <button className="button white full" type="button" disabled={names.length>=12} onClick={()=>setNames([...names,''])}><Plus size={17}/>إضافة لاعب · {names.length}/12</button>
           <label className="crime-narrator-select">مَن الراوي؟<select value={narrator} onChange={e=>setNarrator(Number(e.target.value))}>{names.map((name,i)=><option key={i} value={i}>{name||`اللاعب ${i+1}`}</option>)}</select></label>
-          <p className="field-note">الراوي يعرف الحل ويعطي التلميحات. ملفه يأتي أخيرًا بعد اختيار المجرم.</p><button className="button primary full">وزّع ملفات القضية</button>
+          <p className="field-note">الراوي يعرف الحل ويدير القضية. ملفه يأتي أخيرًا بعد اختيار المجرم.</p><button className="button primary full">وزّع ملفات القضية</button>
         </form><p className="local-privacy">الأدوار محفوظة على هذا الجهاز. تمرير الجوال يعتمد على الأمانة؛ روابط مشاركة البطاقات لا تحتوي على الأدوار أو الحل.</p>
       </section>:view&&<>
         <div className="crime-round-bar"><span>القضية {game.round.toLocaleString('ar-SA')}</span><span>{game.phase==='reveal'?`توزيع الملفات ${game.cursor+1}/${game.order.length}`:game.phase==='investigate'?'التحقيق مفتوح':'أُغلق الملف'}</span></div>
         {game.phase==='reveal'?<PrivateFile key={`${game.round}-${actor}`} view={view} actor={actor} secret={secret} shown={shown} busy={false} seen={seen} onShow={()=>{setShown(true);setSeen(true);}} onHide={()=>setShown(false)} onChoose={(w,e)=>run(()=>chooseCrime(game,actor,w,e),false)} onReady={()=>run(()=>advanceCrimeRole(game))}/>:<>
           <CaseTable key={game.round} view={view} local busy={false} secret={secret} onSecret={()=>setShown(true)} onHide={()=>setShown(false)}
             onAccuse={(a,t,w,e)=>run(()=>accuseCrime(game,a,t,w,e))}
-            onClue={(b,c)=>run(()=>setCrimeClue(game,game.narrator_id,b,c),false)}
             onClose={()=>run(()=>closeCrime(game,game.narrator_id))}
             onTimer={(command,seconds)=>run(()=>crimeTimer(game,command,seconds),false)}/>
           {game.phase==='result'&&<div className="crime-replay"><button className="button primary full" onClick={()=>run(()=>newCrime(game.players.map(p=>p.name),game.players.findIndex(p=>p.id===game.narrator_id),game))}><RefreshCw size={18}/>قضية جديدة وبطاقات جديدة</button><button className="text-button" onClick={reset}>تعديل اللاعبين والراوي</button></div>}
