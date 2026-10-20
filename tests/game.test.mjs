@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 
-let db;
+let db, legacyGroup, legacyRole;
 before(async () => {
   db = new PGlite();
   await db.exec(`
@@ -17,6 +17,11 @@ before(async () => {
     grant execute on function auth.uid() to authenticated, anon;
   `);
   await db.exec(await readFile(new URL('../supabase/migrations/001_lamma.sql',import.meta.url),'utf8'));
+  legacyGroup=await group();
+  await voting(legacyGroup);
+  await rpc(legacyGroup.users[0],'vote',legacyGroup.code,{round:1,target:legacyGroup.ids[1]});
+  legacyRole=await rpc(legacyGroup.users[1],'role',legacyGroup.code,{round:1});
+  await db.exec(await readFile(new URL('../supabase/migrations/002_host_timer.sql',import.meta.url),'utf8'));
 });
 after(async () => { await db?.close(); });
 
@@ -59,6 +64,14 @@ test('migration installs; guests create and join with short codes and persisted 
   assert.equal(other.is_host,false); assert.notEqual(other.me,g.state.me);
   const rejoin=await rpc(g.users[1],'join',g.code.toLowerCase(),{name:'اسم جديد'});
   assert.equal(rejoin.players.length,3); assert.equal(rejoin.me,other.me);
+});
+
+test('upgrade from v1 preserves an active round, its private role and submitted vote',async()=>{
+  const state=await rpc(legacyGroup.users[0],'state',legacyGroup.code);
+  assert.equal(state.phase,'vote');assert.equal(state.votes_count,1);assert.equal(state.timer.enabled,true);
+  assert.deepEqual(await rpc(legacyGroup.users[1],'role',legacyGroup.code,{round:1}),legacyRole);
+  const pause=await rpc(legacyGroup.users[0],'timer_pause',legacyGroup.code,{round:1,name:'vote'});
+  assert.equal(pause.timer.paused,true);assert.equal(pause.players.length,3);
 });
 test('anonymous API key alone cannot call game RPC; missing auth uid is rejected',async()=>{
   await assert.rejects(()=>rpc(null,'create','',{name:'زائر'}),/permission denied/);
@@ -205,4 +218,84 @@ test('creation quota survives leaving and deleting rooms',async()=>{
   await assert.rejects(()=>rpc(u,'create','',{name:'مضيف'}),/CREATE_LIMIT/);
   await db.query("update private.guest_limits set window_start=now()-interval '61 minutes' where user_id=$1",[u]);
   assert.equal((await rpc(u,'create','',{name:'مضيف'})).phase,'lobby');
+});
+
+test('timer migration is repeatable and preserves existing rooms, roles and votes',async()=>{
+  const g=await group(); await voting(g);
+  await rpc(g.users[0],'vote',g.code,{round:1,target:g.ids[1]});
+  const role=await rpc(g.users[1],'role',g.code,{round:1});
+  const migration=await readFile(new URL('../supabase/migrations/002_host_timer.sql',import.meta.url),'utf8');
+  await db.exec(migration);
+  const state=await rpc(g.users[0],'state',g.code);
+  assert.equal(state.votes_count,1); assert.equal(state.timer_version,2);
+  assert.deepEqual(await rpc(g.users[1],'role',g.code,{round:1}),role);
+  for(const fn of ['private.game_action_v1(\'state\',$1)','private.room_state_v1($1::uuid,$2::uuid)']) {
+    await assert.rejects(()=>as(g.users[0],`select ${fn}`,fn.includes('room_state')?[g.state.id,g.users[0]]:[g.code]),/permission denied/);
+  }
+});
+
+test('only current host may change clocks; round and phase guards prevent delayed commands',async()=>{
+  const g=await group();
+  for(const action of ['timer_disable','timer_enable','timer_pause','timer_resume','timer_reset','timer_set']) {
+    await assert.rejects(()=>rpc(g.users[1],action,g.code,{round:0,name:'lobby'}),/HOST_ONLY/);
+    const stranger=await user();
+    await assert.rejects(()=>rpc(stranger,action,g.code,{round:0,name:'lobby'}),/NOT_MEMBER/);
+  }
+  await assert.rejects(()=>rpc(g.users[0],'timer_set',g.code,{round:99,name:'lobby'}),/STALE_ROUND/);
+  await assert.rejects(()=>rpc(g.users[0],'timer_set',g.code,{round:0,name:'discuss'}),/STALE_PHASE/);
+  for(const seconds of [0,14,901]) await assert.rejects(()=>rpc(g.users[0],'timer_set',g.code,{round:0,name:'lobby',seconds}),/INVALID_SECONDS/);
+  await assert.rejects(()=>rpc(g.users[0],'timer_pause',g.code,{round:0,name:'lobby'}),/WRONG_PHASE/);
+});
+
+test('disabled timer persists across phases; voting still completes after everyone votes',async()=>{
+  const g=await group();
+  const off=await rpc(g.users[0],'timer_disable',g.code,{round:0,name:'lobby'});
+  assert.equal(off.timer.enabled,false);
+  const v=await voting(g); assert.equal(v.deadline,null); assert.equal(v.timer.enabled,false);
+  for(let i=0;i<3;i++) await rpc(g.users[i],'vote',g.code,{round:1,target:g.ids[(i+1)%3]});
+  const result=await rpc(g.users[0],'state',g.code); assert.equal(result.phase,'result');
+  assert.equal((await start(g)).timer.enabled,false);
+});
+
+test('pause retains time, set adjusts paused clock, resume and reset create server deadlines',async()=>{
+  const g=await group(); await voting(g);
+  await db.query("update private.rooms set deadline=now()+interval '25 seconds' where code=$1",[g.code]);
+  const paused=await rpc(g.users[0],'timer_pause',g.code,{round:1,name:'vote'});
+  assert.equal(paused.deadline,null); assert.equal(paused.timer.paused,true);
+  assert.ok(paused.timer.remaining_seconds>=24 && paused.timer.remaining_seconds<=25);
+  const set=await rpc(g.users[0],'timer_set',g.code,{round:1,name:'vote',seconds:180});
+  assert.equal(set.timer.remaining_seconds,180); assert.equal(set.deadline,null);
+  assert.equal((await rpc(g.users[1],'state',g.code)).phase,'vote');
+  const resume=await rpc(g.users[0],'timer_resume',g.code,{round:1,name:'vote'});
+  assert.equal(resume.timer.paused,false); assert.equal(resume.timer.remaining_seconds,null);
+  assert.equal(Date.parse(resume.deadline)-Date.parse(resume.server_time),180000);
+  const reset=await rpc(g.users[0],'timer_reset',g.code,{round:1,name:'vote'});
+  assert.equal(Date.parse(reset.deadline)-Date.parse(reset.server_time),180000);
+  const member=await rpc(g.users[1],'state',g.code); assert.deepEqual(member.timer,reset.timer);
+  assert.equal(member.result,null); assert.ok(!JSON.stringify(member).includes('outsider'));
+});
+
+test('expired voting cannot be revived by timer controls and cancelled rounds clear clock state',async()=>{
+  for(const command of ['timer_enable','timer_disable','timer_pause','timer_set','timer_reset']) {
+    const g=await group(); await voting(g);
+    await db.query("update private.rooms set deadline=now()-interval '1 second' where code=$1",[g.code]);
+    const s=await rpc(g.users[0],command,g.code,{round:1,name:'vote',seconds:300});
+    assert.equal(s.phase,'result'); assert.equal(s.deadline,null);
+  }
+  const g=await group();await voting(g);
+  await rpc(g.users[0],'timer_pause',g.code,{round:1,name:'vote'});
+  const cancelled=await rpc(g.users[0],'cancel',g.code,{round:1});
+  assert.equal(cancelled.timer.paused,false);assert.equal(cancelled.timer.remaining_seconds,null);assert.equal(cancelled.result,null);
+});
+
+test('host takeover transfers clock authority; discussion settings apply to next phase',async()=>{
+  const g=await group(); await start(g);
+  await rpc(g.users[0],'timer_set',g.code,{round:1,name:'reveal',seconds:240});
+  for(const u of g.users) await rpc(u,'ready',g.code,{round:1});
+  const d=await rpc(g.users[0],'discuss',g.code,{round:1});
+  assert.equal(Date.parse(d.deadline)-Date.parse(d.server_time),240000);
+  await db.query("update private.players set last_seen=now()-interval '61 seconds' where id=$1",[g.ids[0]]);
+  await rpc(g.users[1],'claim_host',g.code);
+  await assert.rejects(()=>rpc(g.users[0],'timer_disable',g.code,{round:1,name:'discuss'}),/HOST_ONLY/);
+  assert.equal((await rpc(g.users[1],'timer_disable',g.code,{round:1,name:'discuss'})).deadline,null);
 });

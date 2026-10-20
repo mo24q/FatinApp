@@ -6,7 +6,7 @@ import '@fontsource/noto-sans-arabic/700.css';
 import '@fontsource/noto-sans-arabic/800.css';
 import './globals.css';
 export const metadata: Metadata = {
-  title: 'فطين | ألعاب تجمعنا', applicationName: 'فطين', description: 'فطين: ألعاب جماعية عربية لجلساتكم. افتح غرفة، شارك الرمز، وخلّ اللمّة تبدأ.'
+  title: 'فطين | ألعاب تجمعنا', applicationName: 'فطين', description: 'فطين: ألعاب جماعية عربية لجلساتكم. العبوا بغرفة مشتركة أو مرّروا جوالًا واحدًا. فطين يجمعكم.'
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ar" dir="rtl"><body><a href="#main" className="skip-link">انتقل للمحتوى</a>{children}</body></html>;
