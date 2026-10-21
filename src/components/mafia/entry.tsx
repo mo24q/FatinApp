@@ -1,0 +1,17 @@
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Smartphone, Users, Moon } from 'lucide-react';
+import { Brand, Footer } from '../brand';
+import { Captcha } from '../captcha';
+import { MafiaRules, RoleArt } from './shared';
+import { configured, ensureGuest } from '@/lib/supabase';
+import { mafiaAction, mafiaError } from '@/lib/mafia-client';
+import type { MafiaView } from '@/lib/mafia-game';
+export function MafiaEntry({join=''}:{join?:string}){
+  const router=useRouter(),[form,setForm]=useState<'create'|'join'|null>(join?'join':null),[name,setName]=useState(''),[code,setCode]=useState(join.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[captcha,setCaptcha]=useState('');
+  return <div className="room-shell mafia-shell"><header className="header room-header"><Brand/><Link className="text-button" href="/">ألعاب فطين</Link></header><main id="main"><section className="mafia-intro"><span className="eyebrow"><Moon size={17}/> مدينة صغيرة. أسرار كثيرة.</span><h1>المافيا<span className="orange">.</span></h1><p>ليل فيه خطط، ونهار فيه شكوك.<br/>فطين يدير اللعبة، وأنتم تكشفون بعض.</p><div className="mafia-cast"><RoleArt role="doctor"/><RoleArt/><RoleArt role="detective"/></div><div className="mafia-facts"><span>٥–١٢ لاعبًا</span><span>راوي آلي أو بشري</span><span>جوال واحد أو أكثر</span></div></section>
+    {!form?<section className="mafia-entry-options"><Link className="mode-option" href="/mafia/local"><span className="mode-symbol"><Smartphone size={24}/></span><span><strong>جوال واحد</strong><small>أضيفوا أسماءكم، ومرّروا الأسرار بينكم.</small></span><ArrowLeft size={19}/></Link><button className="mode-option" onClick={()=>setForm('create')}><span className="mode-symbol"><Users size={24}/></span><span><strong>كل واحد بجواله</strong><small>غرفة خاصة؛ كل دور يصل لصاحبه.</small></span><ArrowLeft size={19}/></button><button className="text-button" onClick={()=>setForm('join')}>معي رمز غرفة المافيا</button></section>:<section className="panel mafia-entry"><h2>{form==='create'?'اجمع أهل المدينة':'مكانك في المدينة'}</h2><p>اسمك يكفي. اختيار الراوي والأدوار من داخل الغرفة.</p>{!configured&&<div className="notice">الغرف تحتاج ربط Supabase. نسخة الجوال الواحد متاحة دون الربط.</div>}<form onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');try{await ensureGuest(captcha);const room=await mafiaAction<MafiaView>(form,code,null,{name});router.push(`/mafia/room/${room.code}`);}catch(err){setError(mafiaError(err));setBusy(false);}}}><label>اسمك<input required minLength={2} maxLength={20} autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)}/></label>{form==='join'&&<label>رمز الغرفة<input dir="ltr" className="code-input" required pattern="[A-Z0-9]{6}" minLength={6} maxLength={6} autoCapitalize="characters" autoComplete="off" value={code} onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6))}/></label>}<Captcha onToken={setCaptcha}/>{error&&<p className="error-message" role="alert">{error}</p>}<button className="button primary full" disabled={busy||!configured}>{busy?'نجهّز المدينة…':form==='create'?'إنشاء غرفة':'دخول الغرفة'}</button></form><button className="text-button" disabled={busy} onClick={()=>setForm(null)}>رجوع لطرق اللعب</button></section>}
+    <MafiaRules/></main><Footer/></div>;
+}

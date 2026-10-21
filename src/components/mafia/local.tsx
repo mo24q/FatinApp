@@ -1,0 +1,29 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Plus, X, RotateCcw } from 'lucide-react';
+import { Brand, Footer } from '../brand';
+import { MafiaBoard, MafiaControls, MafiaPrivate, MafiaRules, MafiaSetup } from './shared';
+import { mafiaDefaults, mafiaLocalAction, mafiaPending, mafiaPublic, mafiaSecret, newMafia, restoreMafia, type MafiaLocal, type MafiaSecret } from '@/lib/mafia-game';
+import { mafiaError } from '@/lib/mafia-client';
+const key='fatin-mafia-local-v1';
+export function MafiaLocalGame(){
+  const [game,setGame]=useState<MafiaLocal|null>(null),[loaded,setLoaded]=useState(false),[names,setNames]=useState(['','','','','']),[config,setConfig]=useState(mafiaDefaults(5)),[narrator,setNarrator]=useState('p0'),[actor,setActor]=useState(''),[secret,setSecret]=useState<MafiaSecret|null>(null),[error,setError]=useState(''),[storageWarning,setStorageWarning]=useState(''),[confirm,setConfirm]=useState(false);
+  const current=useRef<MafiaLocal|null>(null);
+  function hide(){setSecret(null);}
+  function accept(next:MafiaLocal){current.current=next;setGame(next);hide();setActor('');setConfirm(false);}
+  useEffect(()=>{try{const restored=restoreMafia(sessionStorage.getItem(key));if(restored){current.current=restored;setGame(restored);setNames(restored.players.map(p=>p.name));setConfig(restored.config);setNarrator(restored.narrator_id??'p0');}}catch{setStorageWarning('تعذّر الحفظ على الجهاز. إبقاء الصفحة مفتوحة يحافظ على الجولة.');}setLoaded(true);const conceal=()=>setSecret(null);window.addEventListener('blur',conceal);document.addEventListener('visibilitychange',conceal);return()=>{window.removeEventListener('blur',conceal);document.removeEventListener('visibilitychange',conceal);};},[]);
+  useEffect(()=>{if(!loaded)return;try{if(game)sessionStorage.setItem(key,JSON.stringify(game));else sessionStorage.removeItem(key);}catch{setStorageWarning('تعذّر حفظ الجولة. لا تغلق الصفحة قبل انتهائها.');}},[game,loaded]);
+  function act(action:string,payload:Record<string,unknown>={},who?:string){const g=current.current;if(!g)return;try{setError('');accept(mafiaLocalAction(g,who??g.narrator_id??g.players[0].id,action,payload));}catch(e){setError(mafiaError(e));}}
+  function start(){try{setError('');accept(newMafia(names,Number(narrator.slice(1)),config,current.current??undefined));}catch(e){setError(mafiaError(e));}}
+  function remove(index:number){setNames(names.filter((_,i)=>i!==index));setNarrator('p0');setConfig({...config,mafia:Math.min(config.mafia,Math.max(1,Math.floor((names.length-1-Number(config.moderator))/3)))});}
+  const view=game?mafiaPublic(game):null;
+  const selected=actor|| (view?mafiaPending(view)[0]?.id??view.narrator_id??view.players[0].id:'');
+  const setup=!game||game.phase==='result';
+  return <div className="room-shell mafia-shell"><header className="header room-header"><Brand/><Link href="/mafia" className="text-button">طرق اللعب</Link></header><main id="main"><div className="mafia-heading"><span className="section-kicker">فطين · جوال يمر بينكم</span><h1>المافيا<span className="orange">.</span></h1></div>{storageWarning&&<p className="notice">{storageWarning}</p>}{error&&<p className="error-message" role="alert">{error}</p>}
+    {!loaded?<p>نجهّز المدينة…</p>:<>{view&&<>{view.phase!=='result'&&<><div className="mafia-pass"><label>مرّر الجوال إلى<select value={selected} onChange={e=>{hide();setActor(e.target.value);}}>{view.players.map(p=><option key={p.id} value={p.id}>{p.name}{p.done?' · أكمل اختياره':''}{!p.alive&&p.id!==view.narrator_id?' · متفرج':''}</option>)}</select></label><small>أخفِ الشاشة قبل التمرير. لا تفتح ملف غيرك.</small></div><MafiaPrivate key={`${view.round}-${view.step}-${selected}-${!!secret}`} view={view} actor={selected} secret={secret} busy={false} onShow={()=>{if(game)setSecret(mafiaSecret(game,selected));}} onHide={hide} onAction={(action,payload)=>act(action,payload,selected)}/></>}
+    <MafiaBoard view={view}/><MafiaControls key={`${view.round}-${view.step}`} view={view} canManage busy={false} onAction={(action,payload)=>act(action,payload)} onExpire={()=>{if(current.current?.phase==='day')act('open_vote');}}/>
+    {view.phase!=='result'&&<div className="mafia-session-actions"><button className="text-button danger" onClick={()=>{hide();setConfirm(true);}}>إلغاء الجولة وتعديل اللاعبين</button>{confirm&&<div className="notice"><p>ترجعون للإعداد وتُحذف أدوار هذه الجولة. متأكد؟</p><button className="button white" onClick={()=>{current.current=null;setGame(null);hide();setActor('');setConfirm(false);}}>إلغاء الجولة</button><button className="text-button" onClick={()=>setConfirm(false)}>نكمل اللعب</button></div>}</div>}</>}
+    {setup&&<section className="panel"><h2>{game?'مدينة جديدة؟':'مين بيلعب؟'}</h2><p>ابدؤوا بخمسة لاعبين. أضيفوا لاعبًا سادسًا إذا تبغون راويًا بشريًا.</p><div className="mafia-name-list">{names.map((name,i)=><div key={i}><span>{i+1}</span><input aria-label={`اسم اللاعب ${i+1}`} placeholder={`اللاعب ${i+1}`} minLength={2} maxLength={20} value={name} onChange={e=>setNames(names.map((n,j)=>j===i?e.target.value:n))}/><button className="icon-button" aria-label={`حذف اللاعب ${i+1}`} disabled={names.length<=5} onClick={()=>remove(i)}><X size={17}/></button></div>)}</div><button className="text-button" disabled={names.length>=12} onClick={()=>setNames([...names,''])}><Plus size={17}/> أضف لاعبًا</button><MafiaSetup players={names.map((name,i)=>({id:'p'+i,name:name||`اللاعب ${i+1}`}))} config={config} onConfig={setConfig} narrator={narrator} onNarrator={setNarrator}/><button className="button primary full" disabled={names.length<(config.moderator?6:5)} onClick={start}><RotateCcw size={17}/>{game?'وزّع أدوارًا جديدة':'وزّع الأدوار'}</button><p className="field-note">تُحفظ الجولة في هذا التبويب حتى ٢٤ ساعة. إغلاق التبويب قد يفقد الجلسة.</p></section>}
+    </>}<MafiaRules/></main><Footer/></div>;
+}
