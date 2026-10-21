@@ -37,8 +37,8 @@ export function Home() {
       const room = await action<Room>(modal === 'create' ? 'create' : 'join', code, { p_name: name.trim(), p_seconds: seconds });
       localStorage.setItem('lamma-name', name.trim());
       const game='game' in room?room.game:'outsider';
-      if(game!=='crime'&&game!=='mafia')localStorage.setItem('lamma-room', room.code);
-      router.push(game==='crime'||game==='mafia'?`/${game}/room/${room.code}`:`/room/${room.code}`);
+      if(game!=='crime'&&game!=='mafia'&&game!=='wave')localStorage.setItem('lamma-room', room.code);
+      router.push(game==='crime'||game==='mafia'||game==='wave'?`/${game}/room/${room.code}`:`/room/${room.code}`);
     } catch (e) { setError(friendlyError(e)); setBusy(false); }
   }
   return <div className="site-shell">
@@ -66,7 +66,7 @@ export function Home() {
         <div className="games-grid">{games.map((game, i) => <article key={game.id} className={`game-card ${game.available ? 'available' : 'coming'}`}>
           <div className={`game-visual visual-${i} ${game.id==='crime'?'visual-crime':game.id==='mafia'?'visual-mafia':''}`}><span className="game-tag">{game.available ? 'جاهزة للّعب' : 'قريبًا'}</span>{game.id==='mafia'?<><Moon className="big-game-icon" strokeWidth={1.2}/><span className="crime-game-label">نامت المدينة…</span></>:game.id==='crime'?<><Fingerprint className="crime-game-icon" size={87} strokeWidth={1.2}/><span className="crime-game-label">ملف القضية · ٠٠٢</span></>:game.id==='outsider' ? <><div className="question-mark">؟</div><Character small/><div className="small-chat">أنا؟ مستحيل!</div></> : game.id==='quick-answer' ? <><Zap className="big-game-icon" strokeWidth={1.5}/><span className="decorative-letters">أ ب ج</span></> : <><div className="wave-circle circle-one"/><div className="wave-circle circle-two"/><Sparkles className="wave-star" size={30}/></>}</div>
           <div className="game-content"><span className="game-category">{game.tag}</span><h3>{game.name}</h3><p>{game.description}</p><div className="game-meta"><span><Users size={16}/>{game.players}</span>{game.time && <span><Clock3 size={16}/>{game.time}</span>}</div>
-            <button disabled={!game.available} className={`button full ${game.available ? 'light-purple' : 'coming-button'}`} onClick={() => game.id==='crime'||game.id==='mafia'?router.push(`/${game.id}`):setModal('mode')}>{game.available ? `نلعب ${game.name}` : 'قريبًا في فطين'}{game.available && <ArrowLeft size={18}/>}</button>
+            <button disabled={!game.available} className={`button full ${game.available ? 'light-purple' : 'coming-button'}`} onClick={() => game.id==='same-wave'?router.push('/wave'):game.id==='crime'||game.id==='mafia'?router.push(`/${game.id}`):setModal('mode')}>{game.available ? `نلعب ${game.name}` : 'قريبًا في فطين'}{game.available && <ArrowLeft size={18}/>}</button>
           </div></article>)}</div>
       </section>
       <section id="how" className="how-section"><div className="section-heading"><div><span className="section-kicker">أسهل من ترتيب الطلعة</span><h2>ثلاث خطوات، وتبدأ السوالف.</h2></div></div><div className="steps-grid">

@@ -1,0 +1,29 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { LockKeyhole, Plus, X } from 'lucide-react';
+import { Brand, Footer } from '../brand';
+import { newWave, restoreWave, waveLocalAction, wavePublic, type WaveLocal } from '@/lib/wave-game';
+import { waveError } from '@/lib/wave-client';
+import { WaveClock, WaveClue, WaveGuess, WaveResultPanel, WaveRoster, WaveRounds, WaveRules, WaveStatus } from './shared';
+const key='fatin-wave-local-v1';
+export function WaveLocalGame(){
+  const [game,setGame]=useState<WaveLocal|null>(null),[loaded,setLoaded]=useState(false),[names,setNames]=useState(['','','']),[total,setTotal]=useState(6),[target,setTarget]=useState<number|null>(null),[playing,setPlaying]=useState(false),[actor,setActor]=useState(''),[error,setError]=useState(''),[warning,setWarning]=useState(''),[confirm,setConfirm]=useState(false);
+  const current=useRef<WaveLocal|null>(null);
+  function hide(){setTarget(null);setPlaying(false);}
+  function accept(next:WaveLocal){current.current=next;setGame(next);setActor('');setConfirm(false);hide();}
+  useEffect(()=>{try{const g=restoreWave(sessionStorage.getItem(key));if(g){current.current=g;setGame(g);setNames(g.players.map(p=>p.name));setTotal(g.total);}}catch{setWarning('تعذّر الحفظ على الجهاز. لا تغلق التبويب أثناء اللعب.');}setLoaded(true);const conceal=()=>{setTarget(null);setPlaying(false);};window.addEventListener('blur',conceal);document.addEventListener('visibilitychange',conceal);return()=>{window.removeEventListener('blur',conceal);document.removeEventListener('visibilitychange',conceal);};},[]);
+  useEffect(()=>{if(!loaded)return;try{if(game)sessionStorage.setItem(key,JSON.stringify(game));else sessionStorage.removeItem(key);}catch{setWarning('تعذّر حفظ الجولة. خلك في نفس الصفحة حتى النهاية.');}},[game,loaded]);
+  function act(action:string,payload:Record<string,unknown>={},who?:string){const g=current.current;if(!g)return;try{setError('');accept(waveLocalAction(g,who??g.players[0].id,action,payload));}catch(e){setError(waveError(e));}}
+  const view=game?wavePublic(game):null;
+  const selected=actor||(view?.players.find(p=>p.id!==view.giver&&!p.done)?.id??'');
+  return <div className="room-shell wave-shell"><header className="header room-header"><Brand/><Link href="/wave" className="text-button">طرق اللعب</Link></header><main id="main"><div className="wave-heading"><span className="section-kicker">فطين · جوال يمر بينكم</span><h1>نفس الموجة<span className="orange">.</span></h1></div>{warning&&<p className="notice">{warning}</p>}{error&&<p className="error-message" role="alert">{error}</p>}
+    {!loaded?<p>نضبط التردد…</p>:<>{view&&<><WaveStatus view={view}/>{view.phase==='clue'&&<WaveClue key={`${view.round}-${target===null}`} view={view} target={target} busy={false} onShow={()=>setTarget(game!.target)} onHide={hide} onAction={(action,payload)=>act(action,payload,view.giver!)}/>}
+      {view.phase==='guess'&&<>{!playing?<section className="panel wave-cover"><LockKeyhole size={28}/><span className="section-kicker">مرّر الجوال إلى</span><h2>{view.players.find(p=>p.id===selected)?.name}</h2><p>افتح المؤشر، اختر مكان التلميح، ثم أخفِ تخمينك.</p><button className="button primary" onClick={()=>setPlaying(true)}>الجوال معي، أبدأ تخميني</button><label>تغيير ترتيب التمرير<select value={selected} onChange={e=>{hide();setActor(e.target.value);}}>{view.players.filter(p=>p.id!==view.giver&&!p.done).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></section>:<><button className="text-button" onClick={hide}>إخفاء المؤشر قبل التمرير</button><WaveGuess key={`${view.round}-${selected}`} view={view} actor={selected} busy={false} onAction={(action,payload)=>act(action,payload,selected)}/></>}
+        <WaveRoster view={view}/><WaveClock key={view.round} view={view} busy={false} onAction={(action,payload)=>act(action,payload)} onExpire={()=>{const g=current.current;if(g?.phase==='guess'&&g.deadline&&Date.parse(g.deadline)<=Date.now()&&Object.keys(g.guesses).length)act('resolve',{force:true});}}/>
+      </>}
+      {['result','complete'].includes(view.phase)&&<WaveResultPanel view={view} busy={false} onAction={(action,payload)=>act(action,payload)}/>}
+      {view.phase!=='complete'&&<div className="wave-session-actions"><button className="text-button danger" onClick={()=>{hide();setConfirm(true);}}>إلغاء اللعبة وتعديل الأسماء</button>{confirm&&<div className="notice"><p>تُحذف نقاط اللعبة الحالية وأهدافها. نرجع للإعداد؟</p><button className="button white" onClick={()=>{current.current=null;setGame(null);hide();setConfirm(false);}}>نعم، إلغاء</button><button className="text-button" onClick={()=>setConfirm(false)}>نكمل</button></div>}</div>}</>}
+      {(!game||game.phase==='complete')&&<section className="panel"><h2>{game?'نضبط موجة جديدة؟':'مين معنا على الموجة؟'}</h2><p>من لاعبين إلى ١٢، وكلكم فريق واحد.</p><div className="wave-names">{names.map((name,i)=><div key={i}><span>{i+1}</span><input aria-label={`اسم اللاعب ${i+1}`} placeholder={`اللاعب ${i+1}`} minLength={2} maxLength={20} value={name} onChange={e=>setNames(names.map((n,j)=>i===j?e.target.value:n))}/><button className="icon-button" aria-label={`حذف اللاعب ${i+1}`} disabled={names.length<=2} onClick={()=>setNames(names.filter((_,j)=>j!==i))}><X size={17}/></button></div>)}</div><button className="text-button" disabled={names.length>=12} onClick={()=>setNames([...names,''])}><Plus size={17}/> أضف لاعبًا</button><WaveRounds total={total} onChange={setTotal}/><button className="button primary full" onClick={()=>{try{setError('');accept(newWave(names,total,current.current??undefined));}catch(e){setError(waveError(e));}}}>يلا نبدأ الموجة</button><p className="field-note">تُحفظ الجلسة في هذا التبويب حتى ٢٤ ساعة. لا تغلقه أثناء اللعب.</p></section>}
+    </>}<WaveRules/></main><Footer/></div>;
+}

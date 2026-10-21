@@ -1,0 +1,17 @@
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Radio, Smartphone, Users } from 'lucide-react';
+import { Brand, Footer } from '../brand';
+import { Captcha } from '../captcha';
+import { WaveDial, WaveRules } from './shared';
+import { configured, ensureGuest } from '@/lib/supabase';
+import { waveAction, waveError } from '@/lib/wave-client';
+import type { WaveView } from '@/lib/wave-game';
+export function WaveEntry({join=''}:{join?:string}){
+  const router=useRouter(),[form,setForm]=useState<'create'|'join'|null>(join?'join':null),[name,setName]=useState(''),[code,setCode]=useState(join.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)),[busy,setBusy]=useState(false),[error,setError]=useState(''),[captcha,setCaptcha]=useState(''),[demo,setDemo]=useState(67);
+  return <div className="room-shell wave-shell"><header className="header room-header"><Brand/><Link href="/" className="text-button">ألعاب فطين</Link></header><main id="main"><section className="wave-intro"><span className="eyebrow"><Radio size={18}/> قد إيش تفهمون بعض؟</span><h1>نفس <span>الموجة</span><i>.</i></h1><p>تلميح واحد. تفسيرات كثيرة.<br/>حرّكوا المؤشر… واكتشفوا قربكم من بعض.</p><div className="wave-demo"><span>جرّب: وين مكان «كوب شاي»؟</span><WaveDial pair={{id:0,left:'بارد',right:'حار'}} value={demo} onChange={setDemo}/></div><div className="wave-facts"><span>٢–١٢ لاعبًا</span><span>٤٠ زوجًا من المفاهيم</span><span>كلكم فريق واحد</span></div></section>
+    {!form?<section className="wave-entry-options"><Link className="mode-option" href="/wave/local"><span className="mode-symbol"><Smartphone size={24}/></span><span><strong>جوال واحد</strong><small>مرّروا الهدف لصاحب التلميح، والتخمينات للبقية.</small></span><ArrowLeft size={19}/></Link><button className="mode-option" onClick={()=>setForm('create')}><span className="mode-symbol"><Users size={24}/></span><span><strong>كل واحد بجواله</strong><small>غرفة خاصة، هدف سري ونتيجة تجمعكم.</small></span><ArrowLeft size={19}/></button><button className="text-button" onClick={()=>setForm('join')}>معي رمز غرفة نفس الموجة</button></section>:<section className="panel wave-entry"><h2>{form==='create'?'افتح موجتكم':'انضم للموجة'}</h2><p>اسمك يكفي؛ ما تحتاج حسابًا.</p>{!configured&&<p className="notice">الغرف تحتاج إعداد Supabase. نسخة الجوال الواحد جاهزة دون الربط.</p>}<form onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');try{await ensureGuest(captcha);const room=await waveAction<WaveView>(form,code,null,{name});router.push(`/wave/room/${room.code}`);}catch(err){setError(waveError(err));setBusy(false);}}}><label>اسمك<input required minLength={2} maxLength={20} autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)}/></label>{form==='join'&&<label>رمز الغرفة<input dir="ltr" className="code-input" required pattern="[A-Z0-9]{6}" minLength={6} maxLength={6} autoComplete="off" autoCapitalize="characters" value={code} onChange={e=>setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6))}/></label>}<Captcha onToken={setCaptcha}/>{error&&<p className="error-message" role="alert">{error}</p>}<button className="button primary full" disabled={busy||!configured}>{busy?'نضبط الاتصال…':form==='create'?'إنشاء غرفة':'دخول الغرفة'}</button></form><button className="text-button" disabled={busy} onClick={()=>setForm(null)}>رجوع لطرق اللعب</button></section>}
+    <WaveRules/></main><Footer/></div>;
+}
