@@ -1,3 +1,6 @@
+import content from '../../content/game-content.json';
+import { defaultPlayerNames } from './player-names';
+import { roundScores } from './round-scores';
 export type TimerState = { enabled: boolean; paused: boolean; remaining_seconds: number | null; duration_seconds: number };
 export type TimerCommand = 'timer_enable' | 'timer_disable' | 'timer_pause' | 'timer_resume' | 'timer_reset' | 'timer_set';
 export type LocalRound = {
@@ -6,19 +9,7 @@ export type LocalRound = {
   cursor: number; wordIndex: number; outsider: number; votes: number[];
   timer: TimerState; deadline: number | null;
 };
-// Original everyday vocabulary, independent of the online secret word bank.
-export const localWords = [
-  ['أكل وشرب','كبسة'],['أكل وشرب','بيتزا'],['أكل وشرب','فلافل'],['أكل وشرب','قهوة'],
-  ['أكل وشرب','شاي'],['أكل وشرب','آيس كريم'],['أكل وشرب','بطيخ'],['أكل وشرب','تمر'],
-  ['أماكن','مطار'],['أماكن','مكتبة'],['أماكن','شاطئ'],['أماكن','مستشفى'],
-  ['أماكن','مدرسة'],['أماكن','ملعب'],['أماكن','متحف'],['أماكن','مزرعة'],
-  ['أشياء حولنا','مظلة'],['أشياء حولنا','مفتاح'],['أشياء حولنا','مرآة'],['أشياء حولنا','سماعة'],
-  ['أشياء حولنا','ساعة'],['أشياء حولنا','وسادة'],['أشياء حولنا','حقيبة'],['أشياء حولنا','دراجة'],
-  ['حيوانات','بطريق'],['حيوانات','جمل'],['حيوانات','دلفين'],['حيوانات','أرنب'],
-  ['حيوانات','بومة'],['حيوانات','سلحفاة'],['حيوانات','أسد'],['حيوانات','فراشة'],
-  ['طلعات وهوايات','تخييم'],['طلعات وهوايات','رسم'],['طلعات وهوايات','سباحة'],['طلعات وهوايات','تصوير'],
-  ['طلعات وهوايات','صيد'],['طلعات وهوايات','تسلق'],['طلعات وهوايات','طبخ'],['طلعات وهوايات','زراعة']
-] as const;
+export const localWords = content.outsider;
 
 export function randomIndex(size: number): number {
   if (!Number.isInteger(size) || size<1) throw new Error('عدد غير صالح');
@@ -35,7 +26,7 @@ export function validateNames(names: string[]) {
   return clean;
 }
 export function newLocalRound(names: string[], seconds=120, previous?: LocalRound, now=Date.now(), choose=randomIndex): LocalRound {
-  const players=validateNames(names);
+  const players=validateNames(defaultPlayerNames(names));
   if (!Number.isInteger(seconds) || seconds<15 || seconds>900) throw new Error('اختر مدة من ١٥ إلى ٩٠٠ ثانية.');
   const words=localWords.map((_,i)=>i).filter(i=>i!==previous?.wordIndex);
   const people=players.map((_,i)=>i).filter(i=>!previous || players[i]!==previous.players[previous.outsider]);
@@ -91,7 +82,7 @@ export function localResult(state: LocalRound) {
   if(state.phase!=='result') throw new Error('النتيجة لم تُكشف بعد.');
   const counts=state.players.map((_,i)=>state.votes.filter(v=>v===i).length);
   const top=Math.max(...counts); const leaders=counts.map((v,i)=>v===top?i:-1).filter(i=>i>=0);
-  return {counts,tied:leaders.length>1,caught:leaders.length===1 && leaders[0]===state.outsider};
+  return {scores:roundScores(state.players.map((name,i)=>({id:String(i),name})),String(state.outsider),Object.fromEntries(state.votes.map((target,i)=>[String(i),String(target)]))),counts,tied:leaders.length>1,caught:leaders.length===1 && leaders[0]===state.outsider};
 }
 // Restore the session only; the UI never persists whether a secret is visible.
 export function restoreLocalRound(raw: string | null, now=Date.now()): LocalRound | null {

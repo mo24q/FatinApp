@@ -1,3 +1,4 @@
+import { defaultPlayerNames } from './player-names';
 import { crimeCards, crimeCardById, clueBoards } from './crime-content.ts';
 
 export type CrimePhase = 'lobby'|'reveal'|'investigate'|'result';
@@ -41,7 +42,7 @@ export function crimeNames(names:string[]) {
   return clean;
 }
 export function newCrime(names:string[],narratorIndex:number,previous?:LocalCrime):LocalCrime {
-  const clean=crimeNames(names);
+  const clean=crimeNames(defaultPlayerNames(names));
   if(!Number.isInteger(narratorIndex)||narratorIndex<0||narratorIndex>=clean.length) throw new Error('اختر الراوي.');
   const players=clean.map((name,i)=>({id:`p${i}`,name,online:true,ready:false}));
   const narrator_id=players[narratorIndex].id;

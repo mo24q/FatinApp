@@ -1,0 +1,46 @@
+/* Shared finishing layer: consistent controls and surfaces across Fatin games. */
+:root { --fatin-radius:20px; --fatin-shadow:0 4px 24px #29253405; }
+.room-shell { padding-bottom:24px; }
+.room-shell main { min-width:0; }
+.room-shell .panel { border-radius:var(--fatin-radius); box-shadow:var(--fatin-shadow); }
+.room-shell :is(h1,h2,h3) { text-wrap:balance; }
+.room-shell :is(p,strong,small,label) { overflow-wrap:anywhere; }
+.room-shell .button { min-height:48px; border-radius:13px; font-weight:700; }
+.room-shell .icon-button { min-width:40px; min-height:40px; }
+.room-shell :is(input:not([type=checkbox]):not([type=range]),select) { min-height:48px; border-radius:12px; font-size:16px; }
+.room-shell input[type=checkbox] { accent-color:var(--purple); }
+:is(button,a,input,select,summary):focus-visible { outline:3px solid #9770e4; outline-offset:4px; }
+.room-shell .field-note { line-height:1.9; }
+.room-shell .error-message,.room-shell .notice { border-radius:12px; }
+.game-card { display:flex; flex-direction:column; }
+.game-content { flex:1; display:flex; flex-direction:column; }
+.game-content>.button { margin-top:auto; }
+.common-question { padding:18px; margin:18px 0; border:1px solid #e6dbf5; border-radius:16px; background:#f8f3ff; }
+.common-question small,.common-question strong { display:block; }
+.common-question strong { color:var(--purple); font-size:clamp(19px,4.5vw,25px); margin-top:6px; }
+.round-scores { width:100%; text-align:right; margin:24px 0; padding-top:20px; border-top:1px solid var(--line); }
+.round-scores ol { list-style:none; padding:0; margin:14px 0 0; display:grid; gap:8px; }
+.round-scores li { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 15px; border-radius:12px; background:#f7f3fc; }
+.round-scores small { display:block; color:#71667f; font-size:11px; }
+.round-scores li>b { font-size:23px; color:#5c36aa; font-variant-numeric:tabular-nums; }
+.round-scores li>b.negative { color:#a73750; }
+.night-confirm { padding-top:16px; border-top:1px solid var(--line); margin-top:18px; }
+body:has(.mafia-shell.night-mode) { background:#141523; color:#f3efff; color-scheme:dark; }
+.mafia-shell.night-mode { --ink:#f3efff; --cream:#141523; --muted:#b9b0cc; --line:#38334d; --purple:#bda0ff; --fatin-shadow:none; }
+.mafia-shell.night-mode .panel { background:#202032; border-color:#38334d; color:#f3efff; }
+.mafia-shell.night-mode :is(input,select,.notice,.mafia-private-note,.mafia-secret-roster>div,.mafia-person,.mafia-log .latest) { background:#29283e; color:#f3efff; border-color:#49415e; }
+.mafia-shell.night-mode :is(p,small,.field-note,.section-kicker,.mafia-done,.mafia-section-title,.footer) { color:#c3b9d6; }
+.mafia-shell.night-mode .button.primary { background:#7950c9; color:white; }
+.mafia-shell.night-mode .button.white { background:#333048; color:#f3efff; border-color:#49415e; }
+.mafia-shell.night-mode .avatar { background:#39314e; color:#f3efff; }
+.mafia-shell.night-mode .error-message { background:#432537; color:#ffc8d3; }
+@media(max-width:600px) {
+  .room-shell .panel { padding:20px 16px; }
+  .room-shell .room-header { gap:12px; }
+  .round-scores li { padding:12px; }
+  .room-shell .text-button { min-height:40px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto; }
+  *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
+}

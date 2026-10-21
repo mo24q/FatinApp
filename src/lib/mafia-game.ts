@@ -1,3 +1,5 @@
+import { randomIndex } from './local-game';
+import { defaultPlayerNames } from './player-names';
 import type { TimerState } from './local-game';
 
 export type MafiaRole = 'narrator'|'mafia'|'doctor'|'detective'|'citizen';
@@ -16,14 +18,14 @@ export type MafiaView = {
 export type MafiaLocal = {
   version:1;created_at:number;round:number;step:number;cycle:number;phase:Exclude<MafiaPhase,'lobby'>;
   narrator_id:string|null;players:{id:string;name:string;alive:boolean}[];roles:Record<string,MafiaRole>;
-  ready:string[];actions:Record<string,string>;votes:Record<string,string>;scans:MafiaScan[];
+  ready:string[];night_ready:string[];actions:Record<string,string>;votes:Record<string,string>;scans:MafiaScan[];
   last_save:string|null;config:MafiaConfig;log:MafiaLog[];winner:'town'|'mafia'|null;timer:TimerState;deadline:string|null;
 };
 export const mafiaRoles:Record<MafiaRole,{name:string;detail:string;color:string}>={
   narrator:{name:'الراوي',detail:'تدير الليل والنهار وتعرف الأدوار. لا تشارك في التصويت.',color:'purple'},
   mafia:{name:'مافيا',detail:'اتفق مع فريقك على هدف ليلي، واندس بين أهل المدينة نهارًا.',color:'red'},
   doctor:{name:'الطبيب',detail:'تحمي لاعبًا كل ليلة، ويمكنك حماية نفسك. لا تحمِ نفس الشخص ليلتين متتاليتين.',color:'green'},
-  detective:{name:'المحقق',detail:'تتحقق من انتماء لاعب كل ليلة. النتيجة تظهر لك وحدك عند طلوع النهار.',color:'blue'},
+  detective:{name:'المحقق',detail:'تتحقق من انتماء لاعب كل ليلة. النتيجة تظهر لك وحدك فور تثبيت اختيارك. تحقيق واحد كل ليلة.',color:'blue'},
   citizen:{name:'مواطن',detail:'راقب الكلام وصوّت بذكاء. في الليل أكّد نومك مثل بقية اللاعبين.',color:'gold'},
 };
 export const mafiaDefaults=(count:number):MafiaConfig=>({moderator:false,mafia:count>=8?2:1,doctor:true,detective:true,reveal:false});
@@ -38,7 +40,7 @@ function shuffle<T>(items:T[]):T[]{
   return out;
 }
 export function newMafia(names:string[],narrator:number,config:MafiaConfig,previous?:MafiaLocal):MafiaLocal {
-  const clean=names.map(n=>n.trim());validateMafiaConfig(clean.length,config);
+  const clean=defaultPlayerNames(names);validateMafiaConfig(clean.length,config);
   if(clean.some(n=>n.length<2||n.length>20||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(n)))fail('NAME_INVALID');
   if(new Set(clean.map(n=>n.toLowerCase())).size!==clean.length)fail('NAME_TAKEN');
   if(config.moderator&&(!Number.isInteger(narrator)||!clean[narrator]))fail('INVALID_NARRATOR');
@@ -47,10 +49,10 @@ export function newMafia(names:string[],narrator:number,config:MafiaConfig,previ
   while(deck.length<players.length-(config.moderator?1:0))deck.push('citizen');
   const randomized=shuffle(deck);const roles:Record<string,MafiaRole>={};
   for(const p of players)roles[p.id]=config.moderator&&p.id===players[narrator].id?'narrator':randomized.pop()!;
-  return {version:1,created_at:Date.now(),round:(previous?.round??0)+1,step:1,cycle:1,phase:'reveal',narrator_id:config.moderator?players[narrator].id:null,players,roles,ready:[],actions:{},votes:{},scans:[],last_save:null,config:{...config},log:[],winner:null,timer:{enabled:previous?.timer.enabled??true,paused:false,remaining_seconds:null,duration_seconds:previous?.timer.duration_seconds??180},deadline:null};
+  return {version:1,created_at:Date.now(),round:(previous?.round??0)+1,step:1,cycle:1,phase:'reveal',narrator_id:config.moderator?players[narrator].id:null,players,roles,ready:[],night_ready:[],actions:{},votes:{},scans:[],last_save:null,config:{...config},log:[],winner:null,timer:{enabled:previous?.timer.enabled??true,paused:false,remaining_seconds:null,duration_seconds:previous?.timer.duration_seconds??180},deadline:null};
 }
 export function mafiaPublic(g:MafiaLocal):MafiaView {
-  const players=g.players.map(p=>({...p,online:true,done:g.phase==='reveal'?g.ready.includes(p.id):g.phase==='night'?Object.hasOwn(g.actions,p.id):g.phase==='vote'?Object.hasOwn(g.votes,p.id):false,role:g.phase==='result'||p.id===g.narrator_id||g.config.reveal&&!p.alive?g.roles[p.id]:null}));
+  const players=g.players.map(p=>({...p,online:true,done:g.phase==='reveal'?g.ready.includes(p.id):g.phase==='night'?(g.night_ready??[]).includes(p.id):g.phase==='vote'?Object.hasOwn(g.votes,p.id):false,role:g.phase==='result'||p.id===g.narrator_id||g.config.reveal&&!p.alive?g.roles[p.id]:null}));
   return {game:'mafia',id:'local',code:'',round:g.round,revision:g.step,step:g.step,cycle:g.cycle,phase:g.phase,me:g.narrator_id??g.players[0].id,is_host:true,host_offline:false,narrator_id:g.narrator_id,players,members:players,config:g.config,log:g.log,winner:g.winner,timer:g.timer,deadline:g.deadline,server_time:new Date().toISOString()};
 }
 export function mafiaSecret(g:MafiaLocal,actor:string):MafiaSecret {
@@ -79,26 +81,36 @@ export function mafiaLocalAction(old:MafiaLocal,actor:string,action:string,paylo
       if(!alive.some(p=>p.id===target))fail('INVALID_TARGET');
       if(role==='citizen'||role==='narrator'||role==='mafia'&&g.roles[target]==='mafia'||role==='detective'&&target===actor||role==='doctor'&&target===g.last_save)fail('INVALID_TARGET');
     }
+    if(Object.hasOwn(g.actions,actor)){
+      if(g.actions[actor]===target)return g;
+      fail('ACTION_LOCKED');
+    }
     g.actions[actor]=target;
+    if(role==='detective'&&target!=='skip')g.scans.push({cycle:g.cycle,target,mafia:g.roles[target]==='mafia'});
+  }else if(action==='night_ready'){
+    phase('night');if(!me.alive)fail('ELIMINATED');
+    if(!Object.hasOwn(g.actions,actor))fail('NOT_READY');
+    g.night_ready??=[];if(!g.night_ready.includes(actor))g.night_ready.push(actor);
   }else if(action==='resolve_night'){
-    narrator();phase('night');if(!payload.force&&alive.some(p=>!Object.hasOwn(g.actions,p.id)))fail('WAIT_ACTIONS');
-    let victim=leader(alive.filter(p=>g.roles[p.id]==='mafia').map(p=>g.actions[p.id]??'skip'));
+    narrator();phase('night');if(!payload.force&&alive.some(p=>!(g.night_ready??[]).includes(p.id)))fail('WAIT_ACTIONS');
+    const counts:Record<string,number>={};
+    for(const p of alive.filter(p=>g.roles[p.id]==='mafia')){const choice=g.actions[p.id];if(choice&&choice!=='skip')counts[choice]=(counts[choice]??0)+1;}
+    const highest=Math.max(0,...Object.values(counts)),targets=Object.keys(counts).filter(id=>counts[id]===highest);
+    let victim:string|null=targets.length?targets[randomIndex(targets.length)]:null;
     const doctor=alive.find(p=>g.roles[p.id]==='doctor');const saved=doctor?g.actions[doctor.id]:undefined;
     g.last_save=saved&&saved!=='skip'?saved:null;if(victim===saved)victim=null;
-    const detective=alive.find(p=>g.roles[p.id]==='detective');const inspected=detective?g.actions[detective.id]:undefined;
-    if(inspected&&inspected!=='skip')g.scans.push({cycle:g.cycle,target:inspected,mafia:g.roles[inspected]==='mafia'});
     if(victim)g.players.find(p=>p.id===victim)!.alive=false;
-    g.log.push({cycle:g.cycle,kind:'night',eliminated:victim});g.actions={};transition('day');finish();
+    g.log.push({cycle:g.cycle,kind:'night',eliminated:victim});g.actions={};g.night_ready=[];transition('day');finish();
   }else if(action==='open_vote'){narrator();phase('day');g.votes={};transition('vote');}
   else if(action==='vote'){
-    phase('vote');if(!me.alive)fail('ELIMINATED');if(Object.hasOwn(g.votes,actor))fail('ALREADY_VOTED');
+    phase('vote');if(!me.alive)fail('ELIMINATED');if(Object.hasOwn(g.votes,actor)){if(g.votes[actor]===target)return g;fail('ALREADY_VOTED');}
     if(target!=='skip'&&(target===actor||!alive.some(p=>p.id===target)))fail('INVALID_TARGET');g.votes[actor]=target;
   }else if(action==='resolve_vote'){
     narrator();phase('vote');if(!payload.force&&alive.some(p=>!Object.hasOwn(g.votes,p.id)))fail('WAIT_ACTIONS');
     const choices=alive.map(p=>g.votes[p.id]??'skip'),victim=leader(choices),tally:Record<string,number>={};
     for(const v of choices)tally[v]=(tally[v]??0)+1;
     if(victim)g.players.find(p=>p.id===victim)!.alive=false;
-    g.log.push({cycle:g.cycle,kind:'vote',eliminated:victim,tally});g.cycle++;g.votes={};g.actions={};transition('night');finish();
+    g.log.push({cycle:g.cycle,kind:'vote',eliminated:victim,tally});g.cycle++;g.votes={};g.actions={};g.night_ready=[];transition('night');finish();
   }else if(action.startsWith('timer_')){
     narrator();if(g.phase!=='day')fail('WRONG_PHASE');
     const remaining=g.timer.paused?g.timer.remaining_seconds??0:g.deadline?Math.max(0,Math.ceil((Date.parse(g.deadline)-Date.now())/1000)):g.timer.duration_seconds;
@@ -112,7 +124,7 @@ export function mafiaLocalAction(old:MafiaLocal,actor:string,action:string,paylo
   if(!g.config.moderator){
     const controller=g.players[0].id;
     if(g.phase==='reveal'&&g.players.every(p=>g.ready.includes(p.id)))return mafiaLocalAction(g,controller,'begin');
-    if(g.phase==='night'&&g.players.filter(p=>p.alive).every(p=>Object.hasOwn(g.actions,p.id)))return mafiaLocalAction(g,controller,'resolve_night');
+    if(g.phase==='night'&&g.players.filter(p=>p.alive).every(p=>(g.night_ready??[]).includes(p.id)))return mafiaLocalAction(g,controller,'resolve_night');
     if(g.phase==='vote'&&g.players.filter(p=>p.alive).every(p=>Object.hasOwn(g.votes,p.id)))return mafiaLocalAction(g,controller,'resolve_vote');
   }
   return g;
@@ -126,6 +138,7 @@ export function restoreMafia(raw:string|null):MafiaLocal|null {
     if(g.players.some(p=>typeof p.name!=='string'||p.name.length>20||typeof p.alive!=='boolean'||!Object.hasOwn(mafiaRoles,g.roles[p.id])))return null;
     if(!Array.isArray(g.ready)||!Array.isArray(g.log)||!Array.isArray(g.scans)||!g.actions||!g.votes||!g.timer||!Number.isFinite(g.timer.duration_seconds))return null;
     if(g.deadline!==null&&!Number.isFinite(Date.parse(g.deadline)))return null;
+    g.night_ready??=[];if(!Array.isArray(g.night_ready)||g.night_ready.some(id=>!ids.has(id)))return null;
     return g;
   }catch{return null;}
 }

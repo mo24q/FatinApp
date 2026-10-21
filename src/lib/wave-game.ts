@@ -1,11 +1,7 @@
+import { defaultPlayerNames } from './player-names';
+import content from '../../content/game-content.json';
 import { randomIndex, type TimerState } from './local-game';
-export const wavePairs=[
-  ['بارد','حار'],['هادئ','صاخب'],['خفيف','ثقيل'],['سهل','صعب'],['قريب','بعيد'],['بطيء','سريع'],['قديم','حديث'],['رخيص','غالي'],
-  ['يومي','نادر'],['صغير','ضخم'],['ناعم','خشن'],['مرتب','فوضوي'],['بسيط','معقد'],['مألوف','غريب'],['عملي','للزينة'],['قصير','طويل'],
-  ['فردي','جماعي'],['عفوي','مخطط له'],['مريح','متعب'],['خفيف على المعدة','وجبة دسمة'],['فطور','عشاء'],['للبيت','للطلعات'],['للشتاء','للصيف'],['مالح','حلو'],
-  ['يبغى صبر','يخلص بسرعة'],['للمبتدئ','للمحترف'],['واقعي','خيالي'],['رسمي','عفوي'],['مغامرة','استرخاء'],['يحتاج هدوء','يحتاج حماس'],['سهل حمله','صعب نقله'],['ذكرى قديمة','خطة للمستقبل'],
-  ['شخصي','يصلح هدية'],['يدوي','آلي'],['غامض','واضح'],['يؤكل بالملعقة','يؤكل باليد'],['في الداخل','في الهواء الطلق'],['نشتريه مرة','نشتريه دائمًا'],['يستاهل الانتظار','أفضله فورًا'],['خطوة صغيرة','قرار كبير']
-] as const;
+export const wavePairs=content.wave;
 export type WavePair={id:number;left:string;right:string};
 export type WavePlayer={id:string;name:string;online:boolean;done:boolean};
 export type WavePhase='lobby'|'clue'|'guess'|'result'|'complete';
@@ -21,7 +17,7 @@ export function validWaveClue(value:unknown):string{
 function pick(used:number[]):WavePair{const choices=wavePairs.map((_,i)=>i).filter(i=>!used.includes(i));const id=choices[randomIndex(choices.length)];return {id,left:wavePairs[id][0],right:wavePairs[id][1]};}
 export function newWave(names:string[],total=6,previous?:WaveLocal):WaveLocal{
   if(names.length<2||names.length>12)invalid('WAVE_PLAYERS');
-  const clean=names.map(n=>n.trim());if(clean.some(n=>n.length<2||n.length>20||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(n)))invalid('NAME_INVALID');
+  const clean=defaultPlayerNames(names);if(clean.some(n=>n.length<2||n.length>20||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(n)))invalid('NAME_INVALID');
   if(new Set(clean.map(n=>n.toLowerCase())).size!==clean.length)invalid('NAME_TAKEN');if(![4,6,8,12].includes(total))invalid('WAVE_ROUNDS');
   const pair=pick([]);return {version:1,created_at:Date.now(),round:(previous?.round??0)+1,step:1,phase:'clue',players:clean.map((name,i)=>({id:`p${i}`,name})),giver_index:randomIndex(clean.length),pair,used:[pair.id],target:randomIndex(101),clue:'',guesses:{},turn:1,total,score:0,history:[],timer:{enabled:previous?.timer.enabled??false,paused:false,remaining_seconds:null,duration_seconds:previous?.timer.duration_seconds??120},deadline:null};
 }

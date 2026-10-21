@@ -8,6 +8,6 @@ export type Room = {
   server_time: string; revision: number; players: Player[]; voted: boolean;
   votes_count: number; my_vote: string | null;
   result: null | { word: string; category: string; outsider_id: string; caught: boolean; tied: boolean;
-    votes: { id: string; name: string; count: number }[] };
+    scores?: import('./round-scores').RoundScore[]; votes: { id: string; name: string; count: number }[] };
 };
 export type Secret = { round: number; outsider: boolean; word: string | null; category: string };

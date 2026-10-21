@@ -5,6 +5,7 @@ import '@fontsource/noto-sans-arabic/600.css';
 import '@fontsource/noto-sans-arabic/700.css';
 import '@fontsource/noto-sans-arabic/800.css';
 import './globals.css';
+import './polish.css';
 export const metadata: Metadata = {
   title: 'فطين | ألعاب تجمعنا', applicationName: 'فطين', description: 'فطين: ألعاب جماعية عربية لجلساتكم. العبوا بغرفة مشتركة أو مرّروا جوالًا واحدًا. فطين يجمعكم.'
 };

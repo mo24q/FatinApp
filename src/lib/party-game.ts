@@ -1,4 +1,7 @@
-import content from './party-content.json';
+import { defaultPlayerNames } from './player-names';
+import bank from '../../content/game-content.json';
+import { roundScores, type RoundScore } from './round-scores';
+const content={pairs:bank.wrong,prompts:bank.letters};
 import { randomIndex } from './local-game';
 export type PartyKind='wrong'|'letters';
 export const partyNames:Record<PartyKind,string>={wrong:'السؤال المغلوط',letters:'حرف ورا حرف'};
@@ -6,14 +9,14 @@ export const arabicLetters='ابتثجحخدذرزسشصضطظعغفقكلمنه
 export type PartyPlayer={id:string;name:string;online:boolean;done:boolean;voted:boolean};
 export type PartySecret={question:string;input:'text'|'number'};
 export type LetterUse={letter:string;actor:string};
-export type WrongResult={odd:string;common:string;different:string;tally:Record<string,number>;caught:boolean;tied:boolean};
+export type WrongResult={scores?:RoundScore[];odd:string;common:string;different:string;tally:Record<string,number>;caught:boolean;tied:boolean};
 export type PartyView={game:PartyKind;id:string;code:string;round:number;step:number;revision:number;server_time:string;phase:'lobby'|'answer'|'discuss'|'vote'|'letters'|'result';me:string;is_host:boolean;host_offline:boolean;players:PartyPlayer[];members:PartyPlayer[];answers:Record<string,string>|null;my_answer:string|null;my_vote:string|null;question:string|null;used:LetterUse[];result:WrongResult|null};
 export type PartyLocal={version:1;created_at:number;kind:PartyKind;round:number;step:number;phase:Exclude<PartyView['phase'],'lobby'>;players:{id:string;name:string}[];bank_id:number;bank_used:number[];flip:boolean;odd:string;answers:Record<string,string>;votes:Record<string,string>;used:LetterUse[]};
 const fail=(code:string):never=>{throw new Error(code);};
 export function partyText(value:unknown,max:number){if(typeof value!=='string')return fail('ANSWER_INVALID');const text=value.trim();if(!text||text.length>max||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(text))return fail('ANSWER_INVALID');return text;}
 export function newParty(kind:PartyKind,names:string[],previous?:PartyLocal):PartyLocal{
   if(names.length<(kind==='wrong'?4:1)||names.length>12)fail(kind==='wrong'?'WRONG_PLAYERS':'LETTERS_PLAYERS');
-  const clean=names.map(n=>n.trim());if(clean.some(n=>n.length<2||n.length>20||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(n)))fail('NAME_INVALID');if(new Set(clean.map(n=>n.toLowerCase())).size!==clean.length)fail('NAME_TAKEN');
+  const clean=defaultPlayerNames(names);if(clean.some(n=>n.length<2||n.length>20||/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(n)))fail('NAME_INVALID');if(new Set(clean.map(n=>n.toLowerCase())).size!==clean.length)fail('NAME_TAKEN');
   const size=kind==='wrong'?content.pairs.length:content.prompts.length;
   let used=previous?.kind===kind?[...previous.bank_used]:[];if(used.length>=size)used=[];
   const available=Array.from({length:size},(_,i)=>i).filter(i=>!used.includes(i)),bank_id=available[randomIndex(available.length)];used.push(bank_id);
@@ -26,11 +29,11 @@ export function partySecret(g:PartyLocal,actor:string):PartySecret{
 function result(g:PartyLocal):WrongResult{
   const tally:Record<string,number>={};for(const value of Object.values(g.votes))tally[value]=(tally[value]??0)+1;
   const ranked=Object.entries(tally).sort((a,b)=>b[1]-a[1]),tied=ranked.length>1&&ranked[0][1]===ranked[1][1];
-  const pair=content.pairs[g.bank_id];return {odd:g.odd,common:pair[Number(g.flip)],different:pair[Number(!g.flip)],tally,caught:!tied&&ranked[0]?.[0]===g.odd,tied};
+  const pair=content.pairs[g.bank_id];return {scores:roundScores(g.players,g.odd,g.votes),odd:g.odd,common:pair[Number(g.flip)],different:pair[Number(!g.flip)],tally,caught:!tied&&ranked[0]?.[0]===g.odd,tied};
 }
 export function partyPublic(g:PartyLocal):PartyView{
   const players=g.players.map(p=>({...p,online:true,done:Object.hasOwn(g.answers,p.id),voted:Object.hasOwn(g.votes,p.id)}));
-  return {game:g.kind,id:'local',code:'',round:g.round,step:g.step,revision:g.step,server_time:new Date().toISOString(),phase:g.phase,me:g.players[0].id,is_host:true,host_offline:false,players,members:players,answers:g.kind==='wrong'&&g.phase!=='answer'?{...g.answers}:null,my_answer:null,my_vote:null,question:g.kind==='letters'?content.prompts[g.bank_id]:null,used:g.used,result:g.kind==='wrong'&&g.phase==='result'?result(g):null};
+  return {game:g.kind,id:'local',code:'',round:g.round,step:g.step,revision:g.step,server_time:new Date().toISOString(),phase:g.phase,me:g.players[0].id,is_host:true,host_offline:false,players,members:players,answers:g.kind==='wrong'&&g.phase!=='answer'?{...g.answers}:null,my_answer:null,my_vote:null,question:g.kind==='letters'?content.prompts[g.bank_id]:g.phase!=='answer'?content.pairs[g.bank_id][Number(g.flip)]:null,used:g.used,result:g.kind==='wrong'&&g.phase==='result'?result(g):null};
 }
 export function partyLocalAction(old:PartyLocal,actor:string,action:string,payload:Record<string,unknown>={}):PartyLocal{
   const g=structuredClone(old);if(!g.players.some(p=>p.id===actor))fail('NOT_MEMBER');const host=()=>{if(actor!==g.players[0].id)fail('HOST_ONLY');};

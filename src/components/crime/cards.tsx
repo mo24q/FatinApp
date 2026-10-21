@@ -78,12 +78,11 @@ export function ShareHand({hand,name}:{hand:CrimeHand;name:string}) {
   const [message,setMessage]=useState('');
   const [sharing,setSharing]=useState(false);
   const [retry,setRetry]=useState(0);
-  const [preview,setPreview]=useState(false);
   const current=prepared?.key===key?prepared:null;
   useEffect(()=>{
     let cancelled=false;
     let objectUrl='';
-    setError('');setMessage('');setPreview(false);
+    setError('');setMessage('');
     if(artwork.current){
       const [player,weapons,evidence]=JSON.parse(key) as [string,string[],string[]];
       void createCrimeImage(artwork.current,{player_id:'',weapons,evidence},player).then(file=>{
@@ -99,8 +98,7 @@ export function ShareHand({hand,name}:{hand:CrimeHand;name:string}) {
     const link=document.createElement('a');
     link.href=current.url;link.download=current.file.name;
     document.body.appendChild(link);link.click();link.remove();
-    setPreview(true);
-    setMessage('إذا ما بدأ التنزيل، اضغط مطوّلًا على الصورة واحفظها.');
+    setMessage('تم طلب تنزيل الصورة. تقدر تستخدم زر المشاركة لحفظها من خيارات جهازك.');
   }
   async function share() {
     if(!current||sharing)return;
@@ -123,7 +121,6 @@ export function ShareHand({hand,name}:{hand:CrimeHand;name:string}) {
     {current&&<button type="button" className="text-button" onClick={download}>تنزيل الصورة</button>}
     {error&&<div role="alert"><p>{error}</p><button type="button" className="text-button" onClick={()=>setRetry(value=>value+1)}>إعادة المحاولة</button></div>}
     {message&&<p role="status">{message}</p>}
-    {preview&&current&&<img src={current.url} alt={`بطاقات ${name}: أربعة أسلحة وأربعة أدلة`} style={{width:'100%',height:'auto',borderRadius:16,marginTop:12}}/>}
     <small>صورة البطاقات فقط، بدون رابط أو دور أو حل القضية.</small>
   </div>;
 }

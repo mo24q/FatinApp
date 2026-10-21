@@ -9,8 +9,6 @@ export const games = [
     description: 'واحد سؤالُه غير، حتى هو ما يدري. جاوبوا سرًا، واكتشفوه من الإجابات.' },
   { id: 'letters', name: 'حرف ورا حرف', tag: 'حروف وسوالف', players: '١–١٢ لاعب', time: '٥–١٥ دقيقة', available: true,
     description: 'سؤال واحد و٢٨ حرفًا. قولوا الإجابة واضغطوا حرفها… حتى آخر حرف.' },
-  { id: 'quick-answer', name: 'على السريع', tag: 'سرعة بديهة', players: 'قريبًا', time: '', available: false,
-    description: 'تحديات خفيفة تختبر سرعة البديهة. قريبًا ضمن ألعاب فطين.' },
   { id: 'same-wave', name: 'نفس الموجة', tag: 'توافق وتوقع', players: '٢–١٢ لاعب', time: '١٠–٢٠ دقيقة', available: true,
     description: 'تلميح واحد بين طرفين. حرّكوا المؤشر واجمعوا النقاط… هل أنتم على نفس الموجة؟' }
 ] as const;
