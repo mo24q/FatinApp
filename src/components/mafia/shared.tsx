@@ -20,6 +20,11 @@ export function MafiaSetup({players,config,onConfig,narrator,onNarrator,disabled
   </fieldset>;
 }
 const phaseText={lobby:['أهلًا بأهل المدينة','جمّعوا أصحابكم، واختاروا من يدير اللعبة.'],reveal:['كل واحد وله سر','افتح دورك لحالك، ثم أخفه وأكّد جاهزيتك.'],night:['نامت المدينة…','كل لاعب يفتح دوره ويؤكد اختياره سرًا، حتى المواطن.'],day:['طلع النهار','ناقشوا اللي صار. اسمعوا بعض قبل ما تتهمون.'],vote:['مين تشتبهون فيه؟','صوت واحد لكل لاعب حي. الاختيار سري ولا يمكن تغييره.'],result:['انكشفت الحكاية','الأدوار مكشوفة الآن. مين أقنعكم وهو يخدعكم؟']} as const;
+export function MafiaOpening({view}:{view:MafiaView}){
+  if(view.phase!=='reveal'&&!(view.phase==='night'&&view.cycle===1))return null;
+  const revealing=view.phase==='reveal';
+  return <section className="panel mafia-opening" aria-live="polite"><span className="section-kicker">بداية المافيا في فطين · دورتان منفصلتان</span><h2>{revealing?'١. توزيع الأدوار فقط':'٢. الليل وتفعيل القدرات'}</h2><p>{revealing?'كل لاعب يعرف دوره ويخفيه. لا أحد يستخدم قدرته حتى يطّلع الجميع على أدوارهم.':view.id==='local'?'مرّروا الجوال للجميع مرة ثانية، من أول لاعب. كل حي يفتح قدرته، يثبت اختياره ثم يخفي الشاشة.':'انتهى توزيع الأدوار. الآن كل لاعب حي يفتح قدرته الليلية، يثبت اختياره ثم ينهي دوره.'}</p></section>;
+}
 export function MafiaBoard({view}:{view:MafiaView}){
   const name=(id:string|null)=>view.players.find(p=>p.id===id)?.name??'لا أحد';
   const [heading,detail]=phaseText[view.phase];
@@ -33,7 +38,7 @@ export function MafiaPrivate({view,actor,secret,busy,onShow,onHide,onAction}:{vi
   const me=view.players.find(p=>p.id===actor),[target,setTarget]=useState(secret?.choice??'skip');
   const name=(id:string)=>view.players.find(p=>p.id===id)?.name??'لاعب';
   if(!me)return null;
-  if(!secret)return <section className="panel mafia-cover"><LockKeyhole size={30}/><span className="section-kicker">{view.id==='local'?'الجوال الآن عند':'ملفك السري'}</span><h2>{me.name}</h2><p>تأكد أن الشاشة لك وحدك.</p><button className="button primary" disabled={busy} onClick={onShow}><Eye size={18}/> افتح دوري واختياري</button></section>;
+  if(!secret)return <section className="panel mafia-cover"><LockKeyhole size={30}/><span className="section-kicker">{view.id==='local'?'الجوال الآن عند':'ملفك السري'}</span><h2>{me.name}</h2><p>تأكد أن الشاشة لك وحدك.</p><button className="button primary" disabled={busy} onClick={onShow}><Eye size={18}/> {view.phase==='reveal'?'اعرف دوري فقط':view.phase==='night'?'افتح قدرتي الليلية':view.phase==='vote'?'افتح تصويتي':'افتح ملفي'}</button></section>;
   const info=mafiaRoles[secret.role];
   const options=view.players.filter(p=>p.alive&&(view.phase==='vote'?p.id!==actor:secret.role==='mafia'?p.id!==actor&&!secret.allies.includes(p.id):secret.role==='detective'?p.id!==actor:secret.role==='doctor'?p.id!==secret.last_save:false));
   const choosing=me.alive&&(view.phase==='night'||view.phase==='vote');
@@ -41,7 +46,7 @@ export function MafiaPrivate({view,actor,secret,busy,onShow,onHide,onAction}:{vi
     {!!secret.allies.length&&<div className="mafia-private-note"><strong>فريقك:</strong> {secret.allies.map(id=>`${name(id)}${view.players.find(p=>p.id===id)?.alive?'':' (خرج)'}`).join('، ')}{view.phase==='night'&&Object.entries(secret.actions??{}).map(([id,choice])=><p key={id}>{name(id)} اختار: {choice==='skip'?'عدم الاستهداف':name(choice)}</p>)}</div>}
     {!!secret.scans.length&&<div className="mafia-private-note"><strong>نتائج تحقيقك</strong>{secret.scans.map(scan=><p key={scan.cycle}>ليلة {scan.cycle}: {name(scan.target)} — {scan.mafia?'من المافيا':'من أهل المدينة'}</p>)}</div>}
     {secret.role==='narrator'&&secret.roles&&<div className="mafia-secret-roster">{view.players.map(p=><div key={p.id}><strong>{p.name}</strong><span>{mafiaRoles[secret.roles![p.id]].name}{!p.alive&&p.id!==view.narrator_id?' · خرج':''}</span>{view.phase==='night'&&secret.actions?.[p.id]&&<small>اختار: {secret.actions[p.id]==='skip'?'تجاوز':name(secret.actions[p.id])}</small>}</div>)}</div>}
-    {view.phase==='reveal'&&!me.done&&<button className="button primary full" disabled={busy} onClick={()=>onAction('ready')}>عرفت دوري، أخفِ الشاشة</button>}
+    {view.phase==='reveal'&&!me.done&&<button className="button primary full" disabled={busy} onClick={()=>onAction('ready')}>{view.id==='local'?'عرفت دوري، أخفِ الشاشة ومرّر الجوال':'عرفت دوري، أخفِ الشاشة'}</button>}
     {view.phase==='reveal'&&me.done&&<p className="notice">أكدت جاهزيتك. ننتظر بقية اللاعبين.</p>}
     {choosing&&(view.phase==='night'&&secret.choice!==null?<div className="night-confirm"><p className="field-note">ثبتنا اختيارك{secret.choice==='skip'?': تخطي':''}. أخفِ الشاشة لإنهاء دورك.</p><button className="button primary full" disabled={busy} onClick={()=>me.done?onHide():onAction('night_ready')}>{me.done?'إخفاء الشاشة':'إخفاء وإنهاء دوري'}</button></div>:view.phase==='vote'&&me.done?<p className="notice">ثبتنا صوتك: {secret.choice==='skip'?'تخطي':secret.choice?name(secret.choice):'تم التسجيل'}.</p>:<form onSubmit={e=>{e.preventDefault();onAction(view.phase==='night'?'night_action':'vote',{target:view.phase==='night'&&secret.role==='citizen'?'skip':target});}}>
       {!(view.phase==='night'&&secret.role==='citizen')&&<label>{view.phase==='vote'?'صوتك لإخراج':secret.role==='doctor'?'مين تحمي الليلة؟':secret.role==='detective'?'مين تتحقق منه؟':'مين هدف المافيا؟'}<select value={target} onChange={e=>setTarget(e.target.value)} disabled={busy}><option value="skip">{view.phase==='vote'?'أتخطى التصويت':'أتجاوز اختياري الليلة'}</option>{options.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
