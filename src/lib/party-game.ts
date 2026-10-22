@@ -1,8 +1,8 @@
-import { defaultPlayerNames } from './player-names';
-import bank from '../../content/game-content.json';
-import { roundScores, type RoundScore } from './round-scores';
+import { defaultPlayerNames } from './player-names.ts';
+import bank from '../../content/game-content.json' with { type: 'json' };
+import { roundScores, type RoundScore } from './round-scores.ts';
 const content={pairs:bank.wrong,prompts:bank.letters};
-import { randomIndex } from './local-game';
+import { randomIndex } from './local-game.ts';
 export type PartyKind='wrong'|'letters';
 export const partyNames:Record<PartyKind,string>={wrong:'السؤال المغلوط',letters:'حرف ورا حرف'};
 export const arabicLetters='ابتثجحخدذرزسشصضطظعغفقكلمنهوي'.split('');
@@ -58,6 +58,8 @@ export function restoreParty(raw:string|null,kind:PartyKind):PartyLocal|null{
     if(!Number.isInteger(g.round)||g.round<1||!Number.isInteger(g.step)||typeof g.flip!=='boolean'||!Array.isArray(g.bank_used)||!Array.isArray(g.used)||!g.answers||!g.votes)return null;
     const ids=new Set(g.players.map(p=>p.id));if(ids.size!==g.players.length||kind==='wrong'&&!ids.has(g.odd))return null;
     if(!(kind==='wrong'?['answer','discuss','vote','result']:['letters','result']).includes(g.phase))return null;
+    if(g.bank_used.some(id=>!Number.isInteger(id)||id<0||id>=size)||new Set(g.bank_used).size!==g.bank_used.length||!g.bank_used.includes(g.bank_id))return null;
+    if([g.answers,g.votes].some(map=>Array.isArray(map)||typeof map!=='object'))return null;
     if(Object.entries(g.answers).some(([id,a])=>!ids.has(id)||typeof a!=='string'||a.length>60)||Object.entries(g.votes).some(([id,target])=>!ids.has(id)||target!=='skip'&&!ids.has(target)))return null;
     if(g.used.length>28||new Set(g.used.map(u=>u.letter)).size!==g.used.length||g.used.some(u=>!arabicLetters.includes(u.letter)||!ids.has(u.actor)))return null;return g;
   }catch{return null;}

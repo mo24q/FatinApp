@@ -1,0 +1,15 @@
+فطين — تحديث الصقل والتجربة v8
+
+1. شغّل supabase/migrations/008_readiness.sql في Supabase SQL Editor.
+   الملف المنفصل fatin-readiness-upgrade.sql هو نفسه؛ لا تحتاج الاثنين.
+2. ارفع محتويات fatin-readiness-update.zip إلى جذر GitHub مع استبدال الملفات المطابقة.
+   fatin-project-v8.zip يحتوي المشروع كاملًا، وهو بديل للحزمة المتغيرة.
+3. انتظر نشر Vercel، ثم جرب غرفًا جديدة على عدة أجهزة.
+4. احذف src/lib/party-content.json القديم إن بقي عندك؛ الملف المعتمد content/game-content.json.
+
+التفاصيل والحدود: docs/READINESS.md
+نتائج التحقق: docs/TESTING.md
+إدارة الأسئلة والكلمات: docs/CONTENT.md
+
+77 اختبار قواعد وصلاحيات + 14 سيناريو متصفح ناجحة، وبناء إنتاج ناجح.
+لم تُطبّق الترقية أو يُرفع التحديث إلى حساباتك من جلسة الفحص.

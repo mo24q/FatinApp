@@ -3,6 +3,6 @@ export type RoundScore={id:string;name:string;imposter:boolean;correct:number;re
 export function roundScores(players:{id:string;name:string}[],imposter:string,votes:Record<string,string>):RoundScore[]{
   return players.map(p=>{const received=Object.values(votes).filter(id=>id===p.id).length;
     const odd=p.id===imposter,correct=!odd&&votes[p.id]===imposter?1:0;
-    return {...p,imposter:odd,correct,received,score:(odd?3:correct)-received};
+    return {id:p.id,name:p.name,imposter:odd,correct,received,score:(odd?3:correct)-received};
   });
 }

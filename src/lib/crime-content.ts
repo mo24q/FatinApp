@@ -1,4 +1,4 @@
-import content from '../../content/game-content.json';
+import content from '../../content/game-content.json' with { type: 'json' };
 // Common object names, original selection and artwork. No commercial card assets.
 export type CrimeCard = { id: string; name: string; art: string; kind: 'weapon' | 'evidence' };
 export const crimeCards = content.crime as CrimeCard[];

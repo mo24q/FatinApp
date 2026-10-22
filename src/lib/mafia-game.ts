@@ -1,6 +1,6 @@
-import { randomIndex } from './local-game';
-import { defaultPlayerNames } from './player-names';
-import type { TimerState } from './local-game';
+import { randomIndex } from './local-game.ts';
+import { defaultPlayerNames } from './player-names.ts';
+import type { TimerState } from './local-game.ts';
 
 export type MafiaRole = 'narrator'|'mafia'|'doctor'|'detective'|'citizen';
 export type MafiaPhase = 'lobby'|'reveal'|'night'|'day'|'vote'|'result';
@@ -135,10 +135,16 @@ export function restoreMafia(raw:string|null):MafiaLocal|null {
     validateMafiaConfig(g.players.length,g.config);
     if(!['reveal','night','day','vote','result'].includes(g.phase)||!Number.isInteger(g.round)||g.round<1||!Number.isInteger(g.step)||!Number.isInteger(g.cycle))return null;
     const ids=new Set(g.players.map(p=>p.id));if(ids.size!==g.players.length||(g.config.moderator?(!g.narrator_id||!ids.has(g.narrator_id)||g.roles[g.narrator_id]!=='narrator'):g.narrator_id!==null))return null;
-    if(g.players.some(p=>typeof p.name!=='string'||p.name.length>20||typeof p.alive!=='boolean'||!Object.hasOwn(mafiaRoles,g.roles[p.id])))return null;
+    if(g.players.some(p=>typeof p.id!=='string'||typeof p.name!=='string'||p.name.length<2||p.name.length>20||typeof p.alive!=='boolean'||!Object.hasOwn(mafiaRoles,g.roles[p.id])))return null;
     if(!Array.isArray(g.ready)||!Array.isArray(g.log)||!Array.isArray(g.scans)||!g.actions||!g.votes||!g.timer||!Number.isFinite(g.timer.duration_seconds))return null;
     if(g.deadline!==null&&!Number.isFinite(Date.parse(g.deadline)))return null;
     g.night_ready??=[];if(!Array.isArray(g.night_ready)||g.night_ready.some(id=>!ids.has(id)))return null;
+    if(g.ready.some(id=>!ids.has(id))||new Set(g.ready).size!==g.ready.length||new Set(g.night_ready).size!==g.night_ready.length)return null;
+    if([g.actions,g.votes].some(map=>Array.isArray(map)||typeof map!=='object'||Object.entries(map).some(([id,target])=>!ids.has(id)||target!=='skip'&&!ids.has(target))))return null;
+    if(g.scans.some(s=>!s||!Number.isInteger(s.cycle)||s.cycle<1||!ids.has(s.target)||typeof s.mafia!=='boolean'))return null;
+    if(g.log.some(l=>!l||!Number.isInteger(l.cycle)||l.cycle<1||!['night','vote'].includes(l.kind)||l.eliminated!==null&&!ids.has(l.eliminated)||l.tally&&Object.entries(l.tally).some(([id,n])=>id!=='skip'&&!ids.has(id)||!Number.isInteger(n)||n<0)))return null;
+    if(g.last_save!==null&&!ids.has(g.last_save)||![null,'town','mafia'].includes(g.winner))return null;
+    if(typeof g.timer.enabled!=='boolean'||typeof g.timer.paused!=='boolean'||!Number.isInteger(g.timer.duration_seconds)||g.timer.duration_seconds<15||g.timer.duration_seconds>900||g.timer.remaining_seconds!==null&&(!Number.isInteger(g.timer.remaining_seconds)||g.timer.remaining_seconds<0))return null;
     return g;
   }catch{return null;}
 }

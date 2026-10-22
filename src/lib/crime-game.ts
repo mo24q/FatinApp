@@ -1,4 +1,4 @@
-import { defaultPlayerNames } from './player-names';
+import { defaultPlayerNames } from './player-names.ts';
 import { crimeCards, crimeCardById, clueBoards } from './crime-content.ts';
 
 export type CrimePhase = 'lobby'|'reveal'|'investigate'|'result';

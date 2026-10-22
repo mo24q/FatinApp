@@ -44,3 +44,5 @@ body:has(.mafia-shell.night-mode) { background:#141523; color:#f3efff; color-sch
   html { scroll-behavior:auto; }
   *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
 }
+
+.mafia-shell.night-mode .mafia-cover { background:repeating-linear-gradient(135deg,#202032,#202032 12px,#25253b 12px,#25253b 14px)!important; }

@@ -1,6 +1,6 @@
-import content from '../../content/game-content.json';
-import { defaultPlayerNames } from './player-names';
-import { roundScores } from './round-scores';
+import content from '../../content/game-content.json' with { type: 'json' };
+import { defaultPlayerNames } from './player-names.ts';
+import { roundScores } from './round-scores.ts';
 export type TimerState = { enabled: boolean; paused: boolean; remaining_seconds: number | null; duration_seconds: number };
 export type TimerCommand = 'timer_enable' | 'timer_disable' | 'timer_pause' | 'timer_resume' | 'timer_reset' | 'timer_set';
 export type LocalRound = {

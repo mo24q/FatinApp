@@ -172,6 +172,9 @@ begin
     if g->>'phase'<>'guess' then raise exception 'WRONG_PHASE';end if;
     if actor=g->>'giver' then raise exception 'WAVE_GIVER_GUESS';end if;
     if not exists(select 1 from jsonb_array_elements(g->'players') p where p->>'id'=actor) then raise exception 'NOT_MEMBER';end if;
+    if (g->>'deadline')::timestamptz<=now() and g->'guesses'<>'{}'::jsonb then
+      perform private.wave_resolve(r.id);return private.wave_state(r.id,uid);
+    end if;
     if jsonb_typeof(p_payload->'value') is distinct from 'number' then raise exception 'WAVE_GUESS';end if;
     if (p_payload->>'value')::numeric<>trunc((p_payload->>'value')::numeric) then raise exception 'WAVE_GUESS';end if;
     value:=(p_payload->>'value')::integer;if value not between 0 and 100 then raise exception 'WAVE_GUESS';end if;

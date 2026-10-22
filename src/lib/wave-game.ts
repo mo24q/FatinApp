@@ -1,6 +1,6 @@
-import { defaultPlayerNames } from './player-names';
-import content from '../../content/game-content.json';
-import { randomIndex, type TimerState } from './local-game';
+import { defaultPlayerNames } from './player-names.ts';
+import content from '../../content/game-content.json' with { type: 'json' };
+import { randomIndex, type TimerState } from './local-game.ts';
 export const wavePairs=content.wave;
 export type WavePair={id:number;left:string;right:string};
 export type WavePlayer={id:string;name:string;online:boolean;done:boolean};
@@ -33,6 +33,7 @@ export function waveLocalAction(old:WaveLocal,actor:string,action:string,payload
     if(g.phase!=='clue')invalid('WRONG_PHASE');if(actor!==giver)invalid('WAVE_GIVER_ONLY');g.clue=validWaveClue(payload.clue);g.phase='guess';g.step++;g.deadline=g.timer.enabled?new Date(Date.now()+g.timer.duration_seconds*1000).toISOString():null;
   }else if(action==='guess'){
     if(g.phase!=='guess')invalid('WRONG_PHASE');if(actor===giver)invalid('WAVE_GIVER_GUESS');
+    if(g.deadline&&Date.parse(g.deadline)<=Date.now()&&Object.keys(g.guesses).length){resolve();return g;}
     const value=payload.value;if(typeof value!=='number'||!Number.isInteger(value)||value<0||value>100)invalid('WAVE_GUESS');if(Object.hasOwn(g.guesses,actor))invalid('WAVE_LOCKED');g.guesses[actor]=value as number;
     if(Object.keys(g.guesses).length===g.players.length-1)resolve();
   }else if(action==='resolve'){

@@ -107,7 +107,7 @@ revoke all on function private.party_state(uuid,uuid) from public,anon,authentic
 
 create or replace function public.party_action(p_action text,p_code text default '',p_round integer default null,p_payload jsonb default '{}') returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare uid uuid:=auth.uid(); r private.rooms; me private.players; g jsonb; response jsonb; actor text; kind text; bank private.party_bank; roster jsonb; n integer; picked integer; used jsonb; value text; votes_count integer;
+declare uid uuid:=auth.uid(); r private.rooms; me private.players; g jsonb; response jsonb; actor text; kind text; bank private.party_bank; roster jsonb; n integer; picked integer; used jsonb; input_value text; votes_count integer;
 begin
   if uid is null then raise exception 'AUTH_REQUIRED';end if;
   if p_payload is null or jsonb_typeof(p_payload)<>'object' or octet_length(p_payload::text)>4096 then raise exception 'INVALID_PAYLOAD';end if;
@@ -160,20 +160,20 @@ begin
   when 'answer' then
     if kind<>'wrong' or g->>'phase'<>'answer' then raise exception 'WRONG_PHASE';end if;
     if jsonb_typeof(p_payload->'answer') is distinct from 'string' then raise exception 'ANSWER_INVALID';end if;
-    value:=trim(p_payload->>'answer');
-    if char_length(value) not between 1 and 60 or value~'[[:cntrl:]]' or value~U&'[\200E\200F\202A-\202E\2066-\2069]' then raise exception 'ANSWER_INVALID';end if;
+    input_value:=trim(p_payload->>'answer');
+    if char_length(input_value) not between 1 and 60 or input_value~'[[:cntrl:]]' or input_value~U&'[\200E\200F\202A-\202E\2066-\2069]' then raise exception 'ANSWER_INVALID';end if;
     select * into bank from private.party_bank pb where pb.game=kind and id=(g->>'bank_id')::integer;
-    if bank.input='number' and value!~'^[0-9٠-٩۰-۹]+([.,٫][0-9٠-٩۰-۹]+)?$' then raise exception 'ANSWER_NUMBER';end if;
-    if g->'answers' ? actor then if g->'answers'->>actor=value then return private.party_state(r.id,uid);end if;raise exception 'ANSWER_LOCKED';end if;
-    g:=jsonb_set(g,array['answers',actor],to_jsonb(value));
+    if bank.input='number' and input_value!~'^[0-9٠-٩۰-۹]+([.,٫][0-9٠-٩۰-۹]+)?$' then raise exception 'ANSWER_NUMBER';end if;
+    if g->'answers' ? actor then if g->'answers'->>actor=input_value then return private.party_state(r.id,uid);end if;raise exception 'ANSWER_LOCKED';end if;
+    g:=jsonb_set(g,array['answers',actor],to_jsonb(input_value));
     if (select count(*) from jsonb_each(g->'answers'))=jsonb_array_length(g->'players') then g:=g||jsonb_build_object('phase','discuss','step',(g->>'step')::integer+1);end if;
   when 'open_vote' then
     if kind<>'wrong' or g->>'phase'<>'discuss' then raise exception 'WRONG_PHASE';end if;g:=g||jsonb_build_object('phase','vote','step',(g->>'step')::integer+1);
   when 'vote' then
     if kind<>'wrong' or g->>'phase'<>'vote' then raise exception 'WRONG_PHASE';end if;
-    value:=p_payload->>'target';if value is null or value<>'skip' and not exists(select 1 from jsonb_array_elements(g->'players') p where p->>'id'=value) then raise exception 'INVALID_VOTE';end if;
-    if g->'votes' ? actor then if g->'votes'->>actor=value then return private.party_state(r.id,uid);end if;raise exception 'ALREADY_VOTED';end if;
-    g:=jsonb_set(g,array['votes',actor],to_jsonb(value));
+    input_value:=p_payload->>'target';if input_value is null or input_value<>'skip' and not exists(select 1 from jsonb_array_elements(g->'players') p where p->>'id'=input_value) then raise exception 'INVALID_VOTE';end if;
+    if g->'votes' ? actor then if g->'votes'->>actor=input_value then return private.party_state(r.id,uid);end if;raise exception 'ALREADY_VOTED';end if;
+    g:=jsonb_set(g,array['votes',actor],to_jsonb(input_value));
     if (select count(*) from jsonb_each(g->'votes'))=jsonb_array_length(g->'players') then g:=g||jsonb_build_object('phase','result','step',(g->>'step')::integer+1);end if;
   when 'finish_vote' then
     if kind<>'wrong' or g->>'phase'<>'vote' then raise exception 'WRONG_PHASE';end if;
@@ -182,9 +182,9 @@ begin
     g:=g||jsonb_build_object('phase','result','step',(g->>'step')::integer+1);
   when 'letter' then
     if kind<>'letters' or g->>'phase'<>'letters' then raise exception 'WRONG_PHASE';end if;
-    value:=p_payload->>'letter';if value is null or char_length(value)<>1 or position(value in 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي')=0 then raise exception 'LETTER_INVALID';end if;
-    if exists(select 1 from jsonb_array_elements(g->'used') u where u->>'letter'=value) then raise exception 'LETTER_USED';end if;
-    g:=jsonb_set(g,'{used}',g->'used'||jsonb_build_array(jsonb_build_object('letter',value,'actor',actor)));
+    input_value:=p_payload->>'letter';if input_value is null or char_length(input_value)<>1 or position(input_value in 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي')=0 then raise exception 'LETTER_INVALID';end if;
+    if exists(select 1 from jsonb_array_elements(g->'used') u where u->>'letter'=input_value) then raise exception 'LETTER_USED';end if;
+    g:=jsonb_set(g,'{used}',g->'used'||jsonb_build_array(jsonb_build_object('letter',input_value,'actor',actor)));
     if jsonb_array_length(g->'used')=28 then g:=g||jsonb_build_object('phase','result','step',(g->>'step')::integer+1);end if;
   when 'undo' then
     if kind<>'letters' or g->>'phase' not in ('letters','result') then raise exception 'WRONG_PHASE';end if;

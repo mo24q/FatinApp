@@ -72,7 +72,7 @@ begin
   end if;
   if p_round is distinct from r.round_no then raise exception 'STALE_ROUND'; end if;
   if (p_payload->>'step')::integer is distinct from coalesce((g->>'step')::integer,0) then raise exception 'STALE_PHASE'; end if;
-  role_name:=g->'roles'->>actor;old_phase:=g->>'phase';narrator:=g->>'narrator_id;
+  role_name:=g->'roles'->>actor;old_phase:=g->>'phase';narrator:=g->>'narrator_id';
   if p_action='role' then
     if g is null or role_name is null then raise exception 'NOT_MEMBER'; end if;
     return jsonb_build_object('role',role_name,
