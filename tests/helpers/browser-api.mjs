@@ -23,7 +23,7 @@ export async function browserApi(){
       const uid=tokens.get(req.headers.authorization?.replace(/^Bearer /,''));if(!uid)throw new Error('AUTH_REQUIRED');
       if(url.pathname==='/auth/v1/user'){send(200,session(uid).user);return;}
       const fn=url.pathname.split('/').at(-1);
-      const allowed={game_action:['p_action','p_code','p_name','p_target','p_round','p_seconds'],crime_action:['p_action','p_code','p_round','p_payload'],mafia_action:['p_action','p_code','p_round','p_payload'],wave_action:['p_action','p_code','p_round','p_payload'],party_action:['p_action','p_code','p_round','p_payload']};
+      const allowed={avalon_action:['p_action','p_code','p_round','p_payload'],game_action:['p_action','p_code','p_name','p_target','p_round','p_seconds'],crime_action:['p_action','p_code','p_round','p_payload'],mafia_action:['p_action','p_code','p_round','p_payload'],wave_action:['p_action','p_code','p_round','p_payload'],party_action:['p_action','p_code','p_round','p_payload']};
       if(!url.pathname.startsWith('/rest/v1/rpc/')||!Object.hasOwn(allowed,fn)){send(404,{});return;}
       const args=allowed[fn].map(k=>k==='p_payload'?JSON.stringify(body[k]??{}):body[k]??null);
       const data=(await h.as(uid,`select public.${fn}(${args.map((_,i)=>'$'+(i+1)).join(',')}) data`,args)).rows[0].data;send(200,data);

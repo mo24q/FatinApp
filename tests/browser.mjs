@@ -26,16 +26,17 @@ async function visible(selector){await page.locator(selector).waitFor();}
 async function noOverflow(){assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'horizontal overflow at '+page.url());}
 async function save(name){await noOverflow();await page.screenshot({path:`test-results/${name}.png`,fullPage:true});}
 async function run(name,fn){
+  if(process.env.FATIN_BROWSER_FILTER&&!name.toLowerCase().includes(process.env.FATIN_BROWSER_FILTER.toLowerCase()))return;
   const start=Date.now(),before=errors.length;
   try{await fn();assert.deepEqual(errors.slice(before),[]);results.push({name,pass:true,ms:Date.now()-start});console.log('PASS '+name);}
   catch(e){results.push({name,pass:false,error:e.message});console.log('FAIL '+name+': '+e.message.slice(0,700));if(page)await page.screenshot({path:`test-results/failure-${results.length}.png`,fullPage:true}).catch(()=>{});}
 }
 try{
   await waitServer();browser=await chromium.launch({...(process.env.FATIN_BROWSER?{channel:process.env.FATIN_BROWSER}:{}),headless:true});
-  await run('responsive catalogue and all six entry pages',async()=>{
-    await fresh('/');await visible('.games-grid');assert.equal(await page.locator('.game-card').count(),6);
+  await run('responsive catalogue and all seven entry pages',async()=>{
+    await fresh('/');await visible('.games-grid');assert.equal(await page.locator('.game-card').count(),7);
     for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});await save('home-'+width);}
-    for(const path of ['/mafia','/crime','/wave','/wrong','/letters']){await page.goto(origin+path);await page.setViewportSize({width:320,height:844});await noOverflow();assert.equal(await page.locator('h1').count(),1);}
+    for(const path of ['/avalon','/mafia','/crime','/wave','/wrong','/letters']){await page.goto(origin+path);await page.setViewportSize({width:320,height:844});await noOverflow();assert.equal(await page.locator('h1').count(),1);}
   });
   await run('outsider local: ordered private roles, reload, votes, scores, replay',async()=>{
     await fresh('/local');await click('وزّع الأدوار');
@@ -105,6 +106,30 @@ try{
     const download=page.waitForEvent('download');await click('تنزيل الصورة');const file=await download;await file.saveAs('test-results/crime-hand.png');const png=await readFile('test-results/crime-hand.png');assert.equal(png.subarray(1,4).toString(),'PNG');assert.equal(png.readUInt32BE(16),1080);assert.equal(png.readUInt32BE(20),1500);assert.equal(await page.locator('img[src^="blob:"]').count(),0);
     await click('أنا الراوي، افتح ملف القضية');await click('إغلاق القضية وإعلان فوز المجرم');await click('نعم، أغلق القضية');await click('قضية جديدة وبطاقات جديدة');await click(/افتح ملفي/);
   });
+  await run('Avalon local: fixed handoff, secret cover, missions, final assassination and replay',async()=>{
+    await fresh('/avalon/local');await click('وزّع الأدوار');
+    const state=()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('fatin-avalon-local-v1')));
+    for(let i=0;i<5;i++){
+      assert.equal(await page.locator('select').count(),0);assert.equal(await page.locator('.av-private').count(),0);
+      await click('افتح شاشتي');if(i===0){await page.reload();await visible('.av-cover');await click('افتح شاشتي');await save('avalon-private');}
+      await click('فهمت دوري · أخفِ ومرّر');
+    }
+    for(let mission=1;mission<=3;mission++){
+      await page.getByRole('button',{name:'اعرض الفريق للتصويت',exact:true}).waitFor();const sizes=[2,3,2];
+      for(let i=0;i<sizes[mission-1];i++)await page.locator('.av-choice').nth(i).click();await click('اعرض الفريق للتصويت');
+      for(let i=0;i<5;i++){await click('افتح شاشتي');await click('أوافق');await click('ثبّت الاختيار وأخفِ الشاشة');}
+      for(let i=0;i<sizes[mission-1];i++){await click('افتح شاشتي');await click('إنجاح');await click('ثبّت الاختيار وأخفِ الشاشة');}
+      await visible('.av-result');assert.equal((await state()).history.at(-1).success,true);await click('متابعة اللعبة');
+    }
+    await save('avalon-final-cover');const g=await state(),target=g.players.find(p=>g.roles[p.id]==='merlin').id;
+    for(let i=0;i<5;i++){await click('افتح شاشتي');if(g.roles[g.players[i].id]==='assassin'){await page.locator('.av-private select').selectOption(target);await click('ثبّت هدف الاغتيال وأخفِ الشاشة');}else await click('تم · أخفِ ومرّر');}
+    assert.equal((await state()).winner,'evil');await save('avalon-result');await click('وزّع أدوارًا جديدة');assert.equal((await state()).round,2);
+  });
+  await run('Avalon entry creates room; main join routes to Avalon; reconnect keeps guest seat',async()=>{
+    await fresh('/avalon');await click(/^كل واحد بجواله/);await page.getByLabel('اسمك',{exact:true}).fill('مضيف أفالون');await click('إنشاء غرفة');await page.waitForURL('**/avalon/room/*');const code=page.url().split('/').at(-1);
+    const other=await browser.newContext({viewport:{width:390,height:844}}),guest=await other.newPage();
+    try{await guest.goto(origin+'/?join='+code);await guest.getByLabel('وش نناديك؟').fill('ضيف أفالون');await guest.getByRole('button',{name:'دخول الغرفة',exact:true}).click();await guest.waitForURL('**/avalon/room/*');await page.getByText('ضيف أفالون',{exact:true}).waitFor({timeout:15000});await page.reload();await page.getByText('ضيف أفالون',{exact:true}).waitFor();await context.setOffline(true);await page.getByText('نعيد الاتصال…',{exact:true}).waitFor();await context.setOffline(false);await page.getByText('متصل · تحديث دوري',{exact:true}).waitFor({timeout:15000});await save('avalon-online-lobby');}finally{await other.close();}
+  });
   await run('online guests create and join from separate browsers; refresh and reconnect',async()=>{
     await fresh('/');await click('نلعب برا السالفة');await click(/كل واحد بجواله/);await page.getByLabel('وش نناديك؟').fill('مضيف التجربة');await click('إنشاء الغرفة');await page.waitForURL('**/room/*');const code=page.url().split('/').at(-1);
     const other=await browser.newContext({viewport:{width:390,height:844}}),guest=await other.newPage();
@@ -115,18 +140,19 @@ try{
       await save('online-lobby');
     }finally{await other.close();}
   });
-  for(const [kind,count] of [['outsider',3],['crime',4],['mafia',5],['wave',3],['wrong',4],['letters',2]])await run('online '+kind+': isolated signed-in UI and private data boundaries',async()=>{
+  for(const [kind,count] of [['avalon',5],['outsider',3],['crime',4],['mafia',5],['wave',3],['wrong',4],['letters',2]])await run('online '+kind+': isolated signed-in UI and private data boundaries',async()=>{
     const g=await api.h.group(kind,count);await g.act('start',kind==='crime'?{narrator:g.state.me}:kind==='mafia'?{config:{moderator:false,mafia:1,doctor:true,detective:true,reveal:false}}:kind==='wave'?{total:4}:{});
     let uid=g.users[0];if(kind==='wave')uid=g.byId.get(g.state.giver);
     const path=kind==='outsider'?'/room/':`/${kind}/room/`;await fresh(path+g.code,api.session(uid));
-    if(kind==='wrong'){await click('افتح سؤالي');await visible('.wrong-private');assert.equal(await page.locator('.wrong-answers').count(),0);await page.reload();await click('افتح سؤالي');}
+    if(kind==='avalon'){await click('افتح شاشتي');await visible('.av-private');await click('فهمت دوري · أخفِ ومرّر');await click('افتح شاشتي');}
+    else if(kind==='wrong'){await click('افتح سؤالي');await visible('.wrong-private');assert.equal(await page.locator('.wrong-answers').count(),0);await page.reload();await click('افتح سؤالي');}
     else if(kind==='mafia'){await click('اعرف دوري فقط');await visible('.mafia-private');assert.equal(await page.locator('.mafia-secret-roster').count(),0);}
     else if(kind==='wave'){await click('اكشف الهدف لي');await visible('.wave-private');}
     else if(kind==='crime'){await click(/افتح ملفي/);}
     else if(kind==='letters'){await click('استخدم حرف ف');await page.getByRole('button',{name:'استخدم حرف ف',exact:true}).waitFor({state:'detached'});}
     else{await click('شوف دورك لحالك');await visible('.role-card');}
     await save('online-'+kind);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
-    for(const secret of ['.wrong-private','.mafia-private','.wave-private','.role-card'])assert.equal(await page.locator(secret).count(),0,'secret must be concealed on blur');
+    for(const secret of ['.av-private','.wrong-private','.mafia-private','.wave-private','.role-card'])assert.equal(await page.locator(secret).count(),0,'secret must be concealed on blur');
   });
 }finally{
   if(browser)await browser.close();server.kill();await Promise.race([once(server,'exit').catch(()=>{}),new Promise(r=>setTimeout(r,2000))]);await api.close();
