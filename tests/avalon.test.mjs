@@ -5,6 +5,17 @@ import {database} from './helpers/database.mjs';
 import {avalonAction,avalonDefaults,avalonPending,avalonPublic,avalonSecret,avalonRoles,evilCount,failThreshold,newAvalon,questSizes,restoreAvalon} from '../src/lib/avalon-game.ts';
 let h;before(async()=>{h=await database();});after(async()=>{await h?.db.close();});
 const names=n=>Array.from({length:n},(_,i)=>`لاعب ${i+1}`);
+test('Avalon SQL: every player count and optional role combination has correct balance and exact private knowledge',async()=>{
+  for(let n=5;n<=10;n++)for(let mask=0;mask<16;mask++){
+    const config=Object.fromEntries(['percival','morgana','mordred','oberon'].map((r,i)=>[r,!!(mask&(1<<i))]));
+    const roster=names(n).map((name,i)=>({id:'p'+i,name}));
+    const create=()=>h.db.query('select private.avalon_new($1,$2,1) g',[JSON.stringify(roster),JSON.stringify(config)]);
+    if(1+Number(config.morgana)+Number(config.mordred)+Number(config.oberon)>evilCount(n)){await assert.rejects(create,/AVALON_CONFIG/);continue;}
+    const g=(await create()).rows[0].g;
+    assert.ok(restoreAvalon(JSON.stringify(g)));assert.equal(Object.values(g.roles).filter(r=>avalonRoles[r].evil).length,evilCount(n));
+    for(const p of roster){const s=(await h.db.query('select private.avalon_secret($1,$2) s',[JSON.stringify(g),p.id])).rows[0].s;assert.deepEqual(s,avalonSecret(g,p.id));}
+  }
+});
 test('Avalon: 5–10 player balance, valid optional roles, one-word names, and private knowledge',()=>{
   for(let n=5;n<=10;n++)for(let mask=0;mask<16;mask++){
     const c=Object.fromEntries(['percival','morgana','mordred','oberon'].map((r,i)=>[r,!!(mask&(1<<i))]));
@@ -89,4 +100,55 @@ test('Avalon upgrade is repeatable, retains active games, and caps rooms at ten'
   const g=await h.group('avalon',10);await g.act('start',{config:{percival:true,morgana:true,mordred:true,oberon:true}});const own=await g.act('secret');
   const sql=await readFile(new URL('../supabase/migrations/010_avalon.sql',import.meta.url),'utf8');await h.db.exec(sql);await h.db.exec(sql);assert.deepEqual(await g.act('secret'),own);
   const extra=await h.user();await assert.rejects(()=>h.rpc('avalon',extra,'join',g.code,null,{name:'إضافي'}),/AVALON_FULL/);
+});
+
+test('Avalon online: full game, secret intermediate choices, locked assassination, replay and removed membership',async()=>{
+  const g=await h.group('avalon',5);await g.act('start');const roles={};
+  for(const [id,uid] of g.byId)roles[id]=(await g.act('secret',{},uid)).role;
+  for(const uid of g.users)await g.act('ready',{},uid);
+  for(let mission=1;mission<=3;mission++){
+    const team=g.state.players.slice(0,questSizes[5][mission-1]).map(p=>p.id),leader=g.byId.get(g.state.players[g.state.leader].id);
+    await assert.rejects(()=>g.act('propose',{team:Array(team.length).fill(team[0])},leader),/INVALID_TEAM/);
+    await g.act('propose',{team},leader);
+    for(let i=0;i<g.users.length;i++){
+      await g.act('vote',{approve:true},g.users[i]);
+      if(i<g.users.length-1){assert.equal(g.state.vote_history.length,mission-1);assert.ok(!('ballots'in g.state));}
+    }
+    const first=team[0];await g.act('quest',{success:true},g.byId.get(first));
+    await g.act('quest',{success:true},g.byId.get(first));
+    assert.equal(g.state.history.length,mission-1);assert.ok(!('cards'in g.state));
+    for(const id of team.slice(1))await g.act('quest',{success:true},g.byId.get(id));
+    await g.act('next');
+  }
+  assert.equal(g.state.phase,'assassinate');
+  const assassin=Object.keys(roles).find(id=>roles[id]==='assassin'),merlin=Object.keys(roles).find(id=>roles[id]==='merlin');
+  const other=g.state.players.find(p=>p.id!==assassin&&p.id!==merlin).id;
+  await assert.rejects(()=>g.act('final',{target:merlin},g.byId.get(other)),/ASSASSIN_ONLY/);
+  await assert.rejects(()=>g.act('final',{target:assassin},g.byId.get(assassin)),/INVALID_TARGET/);
+  await g.act('final',{target:merlin},g.byId.get(assassin));
+  await assert.rejects(()=>g.act('final',{target:other},g.byId.get(assassin)),/ACTION_LOCKED/);
+  for(const uid of g.users){const view=await g.act('state',{},uid);assert.equal(view.target,null);assert.equal(view.roles,null);assert.equal(view.winner,null);}
+  for(const [id,uid] of g.byId)if(id!==assassin)await g.act('final',{},uid);
+  assert.equal(g.state.winner,'evil');assert.equal(g.state.target,merlin);assert.deepEqual(g.state.roles,roles);
+  const previous={round:g.state.round,step:g.state.step};await g.act('start');
+  assert.equal(g.state.round,previous.round+1);assert.equal(g.state.roles,null);assert.equal(g.state.target,null);assert.deepEqual(g.state.history,[]);
+  await assert.rejects(()=>h.rpc('avalon',g.users[0],'secret',g.code,previous.round,{step:previous.step}),/STALE_ROUND/);
+  await g.act('cancel');await g.act('remove',{target:[...g.byId.keys()][1]});
+  await assert.rejects(()=>h.rpc('avalon',g.users[1],'state',g.code),/NOT_MEMBER/);
+  await assert.rejects(()=>h.rpc('avalon',g.users[1],'secret',g.code,g.state.round,{step:g.state.step}),/NOT_MEMBER/);
+});
+
+test('Avalon: mixed results reach mission five and protect the guide after a missed assassination',async()=>{
+  const m=await parity(newAvalon(names(7)));for(const p of m.state.players)await m.act(p.id,'ready');
+  for(const success of [true,false,true,false,true]){
+    const g=m.state,bad=g.players.filter(p=>avalonRoles[g.roles[p.id]].evil).map(p=>p.id);
+    const team=[...bad,...g.players.filter(p=>!bad.includes(p.id)).map(p=>p.id)].slice(0,questSizes[7][g.mission-1]);
+    await m.act(g.players[g.leader].id,'propose',{team});for(const p of g.players)await m.act(p.id,'vote',{approve:true});
+    const fails=success?0:failThreshold(7,g.mission);
+    for(let i=0;i<team.length;i++)await m.act(team[i],'quest',{success:i>=fails});await m.act(g.players[0].id,'next');
+  }
+  assert.equal(m.state.history.length,5);assert.equal(m.state.phase,'assassinate');
+  const target=m.state.players.find(p=>m.state.roles[p.id]==='loyal').id;
+  for(const p of m.state.players)await m.act(p.id,'final',m.state.roles[p.id]==='assassin'?{target}:{});
+  assert.equal(m.state.winner,'good');assert.equal(m.state.reason,'protected');
 });

@@ -127,6 +127,7 @@ try{
   });
   await run('Avalon entry creates room; main join routes to Avalon; reconnect keeps guest seat',async()=>{
     await fresh('/avalon');await click(/^كل واحد بجواله/);await page.getByLabel('اسمك',{exact:true}).fill('مضيف أفالون');await click('إنشاء غرفة');await page.waitForURL('**/avalon/room/*');const code=page.url().split('/').at(-1);
+    await page.getByText('يظهر توزيع الفريقين عند اكتمال ٥ لاعبين.',{exact:false}).waitFor();
     const other=await browser.newContext({viewport:{width:390,height:844}}),guest=await other.newPage();
     try{await guest.goto(origin+'/?join='+code);await guest.getByLabel('وش نناديك؟').fill('ضيف أفالون');await guest.getByRole('button',{name:'دخول الغرفة',exact:true}).click();await guest.waitForURL('**/avalon/room/*');await page.getByText('ضيف أفالون',{exact:true}).waitFor({timeout:15000});await page.reload();await page.getByText('ضيف أفالون',{exact:true}).waitFor();await context.setOffline(true);await page.getByText('نعيد الاتصال…',{exact:true}).waitFor();await context.setOffline(false);await page.getByText('متصل · تحديث دوري',{exact:true}).waitFor({timeout:15000});await save('avalon-online-lobby');}finally{await other.close();}
   });
